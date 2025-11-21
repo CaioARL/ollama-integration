@@ -1,0 +1,16 @@
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\config\OpenApiConfig.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\config\SecurityConfig.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\controller\AuthController.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\controller\ChatController.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\dto\AuthRequest.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\dto\AuthResponse.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\dto\ChatRequest.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\dto\ChatResponse.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\dto\TokenValidationResponse.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\OllamaIntegrationApplication.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\security\JwtAuthenticationFilter.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\service\AuthService.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\service\OllamaService.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\util\JwtUtil.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\util\RequestValidator.java
+C:\Users\bfjfh\vscode-workspace\ollama-integration\src\main\java\com\caio\ollama_integration\util\TokenExtractor.java

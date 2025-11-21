@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-OllamaIntegrationApplication<ollama-integration>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.caio.ollama_integration.OllamaIntegrationApplication",
+            "projectName": "ollama-integration",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
