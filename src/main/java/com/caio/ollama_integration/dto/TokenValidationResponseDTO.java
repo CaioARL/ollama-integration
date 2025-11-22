@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Schema(description = "Response de validação de token JWT")
-public class TokenValidationResponse {
+public class TokenValidationResponseDTO {
 
     @Schema(description = "Indica se o token é válido", example = "true")
     private Boolean valid;

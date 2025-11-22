@@ -1,14 +1,16 @@
 package com.caio.ollama_integration.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ChatRequest {
-    private String message;
-    private String model; // opcional, usa o padrão se não informado
-    private Double temperature; // opcional
+public class ChatResponseDTO {
+    private String response;
+    private String model;
+    private Long tokensUsed;
 }

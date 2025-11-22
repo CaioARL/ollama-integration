@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.caio.ollama_integration.dto.AuthRequest;
-import com.caio.ollama_integration.dto.AuthResponse;
+import com.caio.ollama_integration.dto.AuthRequestDTO;
+import com.caio.ollama_integration.dto.AuthResponseDTO;
 import com.caio.ollama_integration.service.AuthService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,8 +27,8 @@ public class AuthController {
 
     @PostMapping()
     @Operation(summary = "Fazer login e gerar token JWT", description = "Autentica usando subject e accessKey configurados. Retorna um token JWT válido para uso no header Authorization como 'Bearer {token}'")
-    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
-        AuthResponse response = authService.authenticate(request);
+    public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthRequestDTO request) {
+        AuthResponseDTO response = authService.authenticate(request);
         return ResponseEntity.ok(response);
     }
 

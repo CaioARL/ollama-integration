@@ -24,6 +24,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.caio.ollama_integration.security.JwtAuthenticationFilter;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
@@ -55,6 +56,7 @@ public class WebSecurityConfig {
 				.cors(customizer -> customizer.configurationSource(this.corsConfigurationSource()))
 				.authorizeHttpRequests(customizer -> customizer
 						.requestMatchers(getPublicRequestMatchersAsArray()).permitAll()
+						.dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
 						.anyRequest().authenticated())
 				.sessionManagement(customizer -> customizer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

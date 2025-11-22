@@ -3,8 +3,8 @@ package com.caio.ollama_integration.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.caio.ollama_integration.dto.AuthRequest;
-import com.caio.ollama_integration.dto.AuthResponse;
+import com.caio.ollama_integration.dto.AuthRequestDTO;
+import com.caio.ollama_integration.dto.AuthResponseDTO;
 import com.caio.ollama_integration.exception.AuthenticationException;
 import com.caio.ollama_integration.exception.InvalidRequestException;
 import com.caio.ollama_integration.util.JwtUtil;
@@ -28,7 +28,7 @@ public class AuthService {
     @Value("${auth.access-key}")
     private String configuredAccessKey;
 
-    public AuthResponse authenticate(AuthRequest request) {
+    public AuthResponseDTO authenticate(AuthRequestDTO request) {
         log.info("Tentativa de autenticação com subject: {}", request.getSubject());
 
         validateCredentials(request);
@@ -37,14 +37,14 @@ public class AuthService {
 
         log.info("Autenticação bem-sucedida para subject: {}", request.getSubject());
 
-        return AuthResponse.builder()
+        return AuthResponseDTO.builder()
                 .token(token)
                 .username(request.getSubject())
                 .expiresIn(jwtExpiration)
                 .build();
     }
 
-    private void validateCredentials(AuthRequest request) {
+    private void validateCredentials(AuthRequestDTO request) {
         if (request == null) {
             throw new InvalidRequestException("Request de autenticação não pode ser nulo");
         }

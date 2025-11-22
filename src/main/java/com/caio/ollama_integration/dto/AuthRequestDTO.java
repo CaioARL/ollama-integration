@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Schema(description = "Request para autenticação do usuário")
-public class AuthRequest {
+public class AuthRequestDTO {
 
     @Schema(description = "Subject do aplicativo", example = "myapp")
     private String subject;

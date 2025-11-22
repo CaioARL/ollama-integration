@@ -164,6 +164,20 @@ Authorization: Bearer {seu_token}
 }
 ```
 
+### Chat com Streaming (SSE)
+
+**POST** `/v1/api/chat/stream` 🔒 *Requer autenticação*
+
+```json
+{
+  "message": "Explique como funciona a inteligência artificial",
+  "model": "llama3.2",
+  "temperature": 0.7
+}
+```
+
+**Response:** Server-Sent Events (SSE) - A resposta é enviada em tempo real, token por token.
+
 ### Health Check
 
 **GET** `/v1/api/chat/health` 🔒 *Requer autenticação*
@@ -217,7 +231,25 @@ $chatResponse = Invoke-RestMethod -Uri "http://localhost:8080/v1/api/chat" -Meth
 Write-Host $chatResponse.response
 ```
 
-### 3. Com cURL:
+### 3. Usar o Chat com Streaming (PowerShell):
+
+```powershell
+$headers = @{
+    "Authorization" = "Bearer $token"
+    "Content-Type" = "application/json"
+}
+
+$chatBody = @{
+    message = "Explique o que é IA em 3 parágrafos"
+    model = "llama3.2"
+} | ConvertTo-Json
+
+# SSE streaming - recebe resposta em tempo real
+Invoke-WebRequest -Uri "http://localhost:8080/v1/api/chat/stream" -Method POST -Body $chatBody -Headers $headers -UseBasicParsing | 
+    Select-Object -ExpandProperty Content
+```
+
+### 4. Com cURL:
 
 ```bash
 # Login
@@ -225,11 +257,18 @@ TOKEN=$(curl -X POST http://localhost:8080/v1/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"subject":"myapp","accessKey":"secretkey123"}' | jq -r '.token')
 
-# Chat
+# Chat (resposta completa)
 curl -X POST http://localhost:8080/v1/api/chat \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"message":"Explique o que é Spring Boot"}'
+
+# Chat com Streaming (resposta em tempo real)
+curl -X POST http://localhost:8080/v1/api/chat/stream \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Explique o que é Spring Boot"}' \
+  -N
 ```
 
 ## 📦 Estrutura do Projeto
@@ -319,7 +358,7 @@ docker-compose down -v
 - [x] Documentação Swagger/OpenAPI
 - [x] Configuração com variáveis de ambiente (.env)
 - [x] Autenticação baseada em subject/accessKey
-- [ ] Adicionar streaming de respostas
+- [x] Adicionar streaming de respostas (SSE)
 - [ ] Implementar histórico de conversação com banco de dados
 - [ ] Adicionar suporte a embeddings
 - [ ] Implementar RAG (Retrieval-Augmented Generation)

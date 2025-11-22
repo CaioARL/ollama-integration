@@ -10,38 +10,62 @@ import org.springframework.ai.ollama.api.OllamaApi.ListModelResponse;
 import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.stereotype.Service;
 
-import com.caio.ollama_integration.dto.ChatRequest;
-import com.caio.ollama_integration.dto.ChatResponse;
+import com.caio.ollama_integration.dto.ChatRequestDTO;
+import com.caio.ollama_integration.dto.ChatResponseDTO;
 import com.caio.ollama_integration.exception.InvalidRequestException;
 import com.caio.ollama_integration.exception.OllamaServiceException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OllamaService {
 
-    private static final String DEFAULT_MODEL = "llama3.2";
+    private static final String DEFAULT_MODEL = "llama3.1";
     private static final double DEFAULT_TEMPERATURE = 0.7;
 
     private final ChatModel chatModel;
     private final OllamaApi ollamaApi;
 
-    public ChatResponse chat(ChatRequest request) {
+    public ChatResponseDTO chat(ChatRequestDTO request) {
         validateChatRequest(request);
 
         log.info("Processando mensagem: {}", request.getMessage());
 
         try {
-            Prompt prompt = buildPrompt(request);
-            org.springframework.ai.chat.model.ChatResponse aiResponse = chatModel.call(prompt);
-
-            return buildChatResponse(request, aiResponse);
+            return buildChatResponse(request, chatModel.call(buildPrompt(request)));
         } catch (Exception e) {
             log.error("Erro ao processar chat: ", e);
             throw new OllamaServiceException("Erro ao comunicar com Ollama: " + e.getMessage(), e);
+        }
+    }
+
+    public Flux<String> chatStream(ChatRequestDTO request) {
+        validateChatRequest(request);
+
+        log.info("Processando mensagem com streaming: {}", request.getMessage());
+
+        try {
+            Prompt prompt = buildPrompt(request);
+
+            return chatModel.stream(prompt)
+                    .map(response -> {
+                        if (response.getResult() != null &&
+                                response.getResult().getOutput() != null &&
+                                response.getResult().getOutput().getContent() != null) {
+                            return response.getResult().getOutput().getContent();
+                        }
+                        return "";
+                    })
+                    .filter(content -> !content.isEmpty())
+                    .doOnComplete(() -> log.info("Streaming completado"))
+                    .doOnError(error -> log.error("Erro no streaming: ", error));
+        } catch (Exception e) {
+            log.error("Erro ao iniciar streaming: ", e);
+            return Flux.error(new OllamaServiceException("Erro ao comunicar com Ollama: " + e.getMessage(), e));
         }
     }
 
@@ -71,19 +95,26 @@ public class OllamaService {
         }
     }
 
-    private void validateChatRequest(ChatRequest request) {
+    // Private Methods
+    private void validateChatRequest(ChatRequestDTO request) {
         if (request == null) {
             throw new InvalidRequestException("Request não pode ser nulo");
         }
         if (request.getMessage() == null || request.getMessage().trim().isEmpty()) {
             throw new InvalidRequestException("Mensagem não pode ser vazia");
         }
+        if (request.getModel() == null || request.getModel().trim().isEmpty()) {
+            request.setModel(DEFAULT_MODEL);
+        }
+        if (request.getTemperature() == null) {
+            request.setTemperature(DEFAULT_TEMPERATURE);
+        }
         if (request.getMessage().length() > 10000) {
             throw new InvalidRequestException("Mensagem muito longa (máximo 10000 caracteres)");
         }
     }
 
-    private Prompt buildPrompt(ChatRequest request) {
+    private Prompt buildPrompt(ChatRequestDTO request) {
         if (request.getModel() != null || request.getTemperature() != null) {
             OllamaOptions options = OllamaOptions.builder()
                     .withModel(request.getModel() != null ? request.getModel() : DEFAULT_MODEL)
@@ -94,14 +125,14 @@ public class OllamaService {
         return new Prompt(request.getMessage());
     }
 
-    private ChatResponse buildChatResponse(ChatRequest request,
-            org.springframework.ai.chat.model.ChatResponse aiResponse) {
+    private ChatResponseDTO buildChatResponse(ChatRequestDTO request,
+                    org.springframework.ai.chat.model.ChatResponse aiResponse) {
         String responseText = aiResponse.getResult().getOutput().getContent();
         Long tokensUsed = aiResponse.getMetadata() != null
                 ? aiResponse.getMetadata().getUsage().getTotalTokens()
                 : 0L;
 
-        return ChatResponse.builder()
+        return ChatResponseDTO.builder()
                 .response(responseText)
                 .model(request.getModel() != null ? request.getModel() : DEFAULT_MODEL)
                 .tokensUsed(tokensUsed)

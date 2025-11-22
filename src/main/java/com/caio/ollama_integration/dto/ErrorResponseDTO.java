@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Schema(description = "Response de erro padronizado")
-public class ErrorResponse {
+public class ErrorResponseDTO {
 
     @Schema(description = "Código de status HTTP", example = "400")
     private int status;

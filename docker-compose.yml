@@ -22,7 +22,6 @@ services:
         sleep 5
         ollama pull llama3.1:latest &
         ollama pull deepseek-coder:latest &
-        ollama pull gpt-oss:120b &
         ollama pull mixtral:latest &
         ollama pull deepseek-r1:latest &
         wait

@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
-import com.caio.ollama_integration.dto.ErrorResponse;
+import com.caio.ollama_integration.dto.ErrorResponseDTO;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,11 +16,11 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidRequestException(
+    public ResponseEntity<ErrorResponseDTO> handleInvalidRequestException(
             InvalidRequestException ex, WebRequest request) {
         log.warn("Requisição inválida: {}", ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Bad Request")
                 .message(ex.getMessage())
@@ -31,11 +31,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+    public ResponseEntity<ErrorResponseDTO> handleIllegalArgumentException(
             IllegalArgumentException ex, WebRequest request) {
         log.warn("Argumento inválido: {}", ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Bad Request")
                 .message(ex.getMessage())
@@ -46,11 +46,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthenticationException(
+    public ResponseEntity<ErrorResponseDTO> handleAuthenticationException(
             AuthenticationException ex, WebRequest request) {
         log.warn("Falha na autenticação: {}", ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.UNAUTHORIZED.value())
                 .error("Unauthorized")
                 .message(ex.getMessage())
@@ -61,11 +61,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(SecurityException.class)
-    public ResponseEntity<ErrorResponse> handleSecurityException(
+    public ResponseEntity<ErrorResponseDTO> handleSecurityException(
             SecurityException ex, WebRequest request) {
         log.warn("Erro de segurança: {}", ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.UNAUTHORIZED.value())
                 .error("Unauthorized")
                 .message(ex.getMessage())
@@ -76,11 +76,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+    public ResponseEntity<ErrorResponseDTO> handleAccessDeniedException(
             AccessDeniedException ex, WebRequest request) {
         log.warn("Acesso negado: {}", ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.FORBIDDEN.value())
                 .error("Forbidden")
                 .message("Você não tem permissão para acessar este recurso")
@@ -91,11 +91,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(OllamaServiceException.class)
-    public ResponseEntity<ErrorResponse> handleOllamaServiceException(
+    public ResponseEntity<ErrorResponseDTO> handleOllamaServiceException(
             OllamaServiceException ex, WebRequest request) {
         log.error("Erro no serviço Ollama: {}", ex.getMessage(), ex);
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.SERVICE_UNAVAILABLE.value())
                 .error("Service Unavailable")
                 .message("Erro ao comunicar com o serviço Ollama: " + ex.getMessage())
@@ -106,11 +106,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(
+    public ResponseEntity<ErrorResponseDTO> handleGenericException(
             Exception ex, WebRequest request) {
         log.error("Erro não tratado: {}", ex.getMessage(), ex);
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error("Internal Server Error")
                 .message("Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.")
