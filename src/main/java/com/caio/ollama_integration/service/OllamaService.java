@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaApi.ListModelResponse;
@@ -125,8 +126,7 @@ public class OllamaService {
         return new Prompt(request.getMessage());
     }
 
-    private ChatResponseDTO buildChatResponse(ChatRequestDTO request,
-                    org.springframework.ai.chat.model.ChatResponse aiResponse) {
+    private ChatResponseDTO buildChatResponse(ChatRequestDTO request, ChatResponse aiResponse) {
         String responseText = aiResponse.getResult().getOutput().getContent();
         Long tokensUsed = aiResponse.getMetadata() != null
                 ? aiResponse.getMetadata().getUsage().getTotalTokens()

@@ -50,7 +50,7 @@ A aplicação estará disponível em: `http://localhost:8080`
 
 ## 📚 Documentação Swagger
 
-Acesse a documentação interativa da API em: `http://localhost:8080/swagger-ui.html`
+Acesse a documentação interativa da API em: `http://localhost:8080//ollama-integration/swagger-ui.html`
 
 ## ⚙️ Configuração com .env
 
@@ -67,16 +67,22 @@ cp .env.example .env
 Edite o `.env` com suas configurações:
 
 ```properties
-# Credenciais de Autenticação
-AUTH_SUBJECT=myapp
-AUTH_ACCESS_KEY=secretkey123
-
-# JWT Secret (altere para produção!)
-JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+# Configurações do Servidor
+SERVER_PORT=8080
+SERVER_SERVLET_CONTEXT_PATH=/ollama-integration
 
 # Configurações do Ollama
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
+
+# Configurações JWT
+# Gere uma chave secreta forte para produção
+JWT_SECRET=your-secret-key-here-change-in-production
+JWT_EXPIRATION=3600000
+
+# Credenciais de Autenticação
+# IMPORTANTE: Altere estes valores para produção!
+AUTH_SUBJECT=myapp
+AUTH_ACCESS_KEY=secretkey123
 ```
 
 ⚠️ **Importante**: O arquivo `.env` está no `.gitignore` e **não deve** ser commitado no repositório!
@@ -85,7 +91,7 @@ OLLAMA_MODEL=llama3.2
 
 ### 1. Obter Token JWT
 
-**POST** `/v1/api/auth/login`
+**POST** `/v1/auth`
 
 ```json
 {
@@ -118,24 +124,7 @@ Authorization: Bearer {seu_token}
 
 ### 3. Validar Token
 
-**POST** `/v1/api/auth/validate`
-
-```
-Authorization: Bearer {seu_token}
-```
-
-**Response:**
-```json
-{
-  "valid": true,
-  "username": "admin",
-  "message": "Token válido"
-}
-```
-
-### 4. Informações do Usuário
-
-**GET** `/v1/api/auth/user-info`
+**POST** `/v1/auth`
 
 ```
 Authorization: Bearer {seu_token}
@@ -145,7 +134,7 @@ Authorization: Bearer {seu_token}
 
 ### Chat com o Agente de IA
 
-**POST** `/v1/api/chat` 🔒 *Requer autenticação*
+**POST** `/v1/chat` 🔒 *Requer autenticação*
 
 ```json
 {
@@ -166,7 +155,7 @@ Authorization: Bearer {seu_token}
 
 ### Chat com Streaming (SSE)
 
-**POST** `/v1/api/chat/stream` 🔒 *Requer autenticação*
+**POST** `/v1/chat/stream` 🔒 *Requer autenticação*
 
 ```json
 {
@@ -178,106 +167,13 @@ Authorization: Bearer {seu_token}
 
 **Response:** Server-Sent Events (SSE) - A resposta é enviada em tempo real, token por token.
 
-### Health Check
-
-**GET** `/v1/api/chat/health` 🔒 *Requer autenticação*
-
-Verifica se o Ollama está acessível e funcionando.
-
-## 📝 Variáveis de Ambiente (.env)
-
-Todas as configurações sensíveis são gerenciadas através do arquivo `.env`:
-
-| Variável | Descrição | Valor Padrão |
-|----------|-----------|--------------|
-| `AUTH_SUBJECT` | Subject para autenticação | `myapp` |
-| `AUTH_ACCESS_KEY` | Chave de acesso secreta | `secretkey123` |
-| `JWT_SECRET` | Secret para assinatura JWT | (gerado) |
-| `JWT_EXPIRATION` | Tempo de expiração do token (ms) | `3600000` |
-| `OLLAMA_BASE_URL` | URL do Ollama | `http://localhost:11434` |
-| `OLLAMA_MODEL` | Modelo LLM padrão | `llama3.2` |
-| `OLLAMA_TEMPERATURE` | Temperatura do modelo (0-1) | `0.7` |
-| `SERVER_PORT` | Porta do servidor | `8080` |
-
-## 🧪 Testando a API
-
-### 1. Obter Token JWT (PowerShell):
-
-```powershell
-$loginBody = @{
-    subject = "myapp"
-    accessKey = "secretkey123"
-} | ConvertTo-Json
-
-$authResponse = Invoke-RestMethod -Uri "http://localhost:8080/v1/api/auth/login" -Method POST -Body $loginBody -ContentType "application/json"
-$token = $authResponse.token
-Write-Host "Token obtido: $token"
-```
-
-### 2. Usar o Chat com Token (PowerShell):
-
-```powershell
-$headers = @{
-    "Authorization" = "Bearer $token"
-    "Content-Type" = "application/json"
-}
-
-$chatBody = @{
-    message = "Explique o que é Spring Boot"
-    model = "llama3.2"
-} | ConvertTo-Json
-
-$chatResponse = Invoke-RestMethod -Uri "http://localhost:8080/v1/api/chat" -Method POST -Body $chatBody -Headers $headers
-Write-Host $chatResponse.response
-```
-
-### 3. Usar o Chat com Streaming (PowerShell):
-
-```powershell
-$headers = @{
-    "Authorization" = "Bearer $token"
-    "Content-Type" = "application/json"
-}
-
-$chatBody = @{
-    message = "Explique o que é IA em 3 parágrafos"
-    model = "llama3.2"
-} | ConvertTo-Json
-
-# SSE streaming - recebe resposta em tempo real
-Invoke-WebRequest -Uri "http://localhost:8080/v1/api/chat/stream" -Method POST -Body $chatBody -Headers $headers -UseBasicParsing | 
-    Select-Object -ExpandProperty Content
-```
-
-### 4. Com cURL:
-
-```bash
-# Login
-TOKEN=$(curl -X POST http://localhost:8080/v1/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"subject":"myapp","accessKey":"secretkey123"}' | jq -r '.token')
-
-# Chat (resposta completa)
-curl -X POST http://localhost:8080/v1/api/chat \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"Explique o que é Spring Boot"}'
-
-# Chat com Streaming (resposta em tempo real)
-curl -X POST http://localhost:8080/v1/api/chat/stream \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"Explique o que é Spring Boot"}' \
-  -N
-```
-
 ## 📦 Estrutura do Projeto
 
 ```
 src/main/java/com/caio/ollama_integration/
 ├── config/
 │   ├── OpenApiConfig.java         # Configuração Swagger/OpenAPI
-│   └── SecurityConfig.java        # Configuração Spring Security
+│   └── WebSecurityConfig.java     # Configuração Spring Security
 ├── controller/
 │   ├── AuthController.java        # Endpoints de autenticação JWT
 │   └── ChatController.java        # Endpoints de chat com IA
@@ -291,7 +187,11 @@ src/main/java/com/caio/ollama_integration/
 │   ├── JwtAuthenticationFilter.java  # Filtro de autenticação JWT
 │   └── JwtUtil.java               # Utilitário JWT (geração/validação)
 ├── service/
+│   ├── AuthService.java           # Lógica de autenticação
 │   └── OllamaService.java         # Lógica de integração com Ollama
+├── util/
+│   ├── JwtUtil.java               # Utilitário de autenticação
+│   └── RequestValidator.java      # Utilitário para validar request
 └── OllamaIntegrationApplication.java
 ```
 
@@ -315,14 +215,14 @@ docker-compose down -v
 ## 🔍 Solução de Problemas
 
 ### Erro 401 Unauthorized
-- Certifique-se de obter o token JWT primeiro através de `/v1/api/auth/login`
+- Certifique-se de obter o token JWT primeiro através de `/v1/auth`
 - Verifique se o header `Authorization: Bearer {token}` está correto
 - Confirme se o token não expirou (validade de 1 hora)
 
 ### Ollama não está acessível
 - Verifique se o container está rodando: `docker ps`
 - Verifique os logs: `docker logs ollama`
-- Teste a conexão: `curl http://localhost:11434/api/tags`
+- Teste a conexão: `curl http://localhost:11434/tags`
 
 ### Modelo não encontrado
 - Liste os modelos instalados: `docker exec -it ollama ollama list`
@@ -330,19 +230,6 @@ docker-compose down -v
 
 ### Porta já em uso
 - Altere a porta em `docker-compose.yml` ou `application.properties`
-
-## 🔐 Segurança
-
-⚠️ **Importante para Produção:**
-
-1. **Proteja o .env**: Nunca commite o arquivo `.env` no repositório
-2. **Altere as Credenciais**: Defina valores seguros para `AUTH_SUBJECT` e `AUTH_ACCESS_KEY`
-3. **JWT Secret Forte**: Gere uma chave secreta criptograficamente segura
-4. **Use HTTPS**: Configure SSL/TLS para comunicação segura
-5. **Rotação de Chaves**: Implemente rotação periódica de access keys
-6. **Rate Limiting**: Adicione limitação de taxa para evitar abuso
-7. **Auditoria**: Implemente logs de auditoria para tentativas de login
-8. **Variáveis de Ambiente**: Use secrets managers em produção (AWS Secrets Manager, Azure Key Vault, etc.)
 
 ## 📚 Recursos
 
