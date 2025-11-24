@@ -18,7 +18,8 @@ docker-compose up -d
 
 Isso irá:
 - Iniciar o Ollama na porta `11434`
-- Iniciar uma interface web (Open WebUI) na porta `3000` para gerenciar modelos
+- Iniciar o MongoDB na porta `27017`
+- Configurar automaticamente o banco de dados para histórico de conversações
 
 ### 2. Baixar um modelo LLM
 
@@ -74,29 +75,49 @@ SERVER_SERVLET_CONTEXT_PATH=/ollama-integration
 # Configurações do Ollama
 OLLAMA_BASE_URL=http://localhost:11434
 
+# Configurações MongoDB
+MONGODB_URI=mongodb://admin:admin123@localhost:27017/ollama_chat?authSource=admin
+MONGODB_DATABASE=ollama_chat
+
 # Configurações JWT
 # Gere uma chave secreta forte para produção
 JWT_SECRET=your-secret-key-here-change-in-production
 JWT_EXPIRATION=3600000
-
-# Credenciais de Autenticação
-# IMPORTANTE: Altere estes valores para produção!
-AUTH_SUBJECT=myapp
-AUTH_ACCESS_KEY=secretkey123
 ```
 
 ⚠️ **Importante**: O arquivo `.env` está no `.gitignore` e **não deve** ser commitado no repositório!
+
+## 🔐 Sistema de Roles e Permissões
+
+A aplicação possui três níveis de permissão:
+
+### USER (Usuário Comum)
+- Usar chat e conversar com IA
+- Gerenciar suas próprias conversações
+- Visualizar histórico de suas conversas
+
+### MODERATOR (Moderador)
+- Todas as permissões de USER
+- Visualizar conversações de outros usuários
+- Listar todos os usuários do sistema
+
+### ADMIN (Administrador)
+- Todas as permissões de MODERATOR
+- Criar novos usuários
+- Atualizar roles de usuários
+- Desativar usuários
+- Deletar qualquer conversação
 
 ## 🔐 Autenticação JWT
 
 ### 1. Obter Token JWT
 
-**POST** `/v1/auth`
+**POST** `/v1/auth/login`
 
 ```json
 {
-  "subject": "myapp",
-  "accessKey": "secretkey123"
+  "username": "admin",
+  "password": "admin123"
 }
 ```
 
@@ -105,14 +126,13 @@ AUTH_ACCESS_KEY=secretkey123
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "type": "Bearer",
-  "username": "myapp",
+  "username": "admin",
+  "roles": ["USER", "ADMIN"],
   "expiresIn": 3600000
 }
 ```
 
-**Credenciais:**
-- Definidas no arquivo `.env` através de `AUTH_SUBJECT` e `AUTH_ACCESS_KEY`
-- Por padrão: `subject=myapp` e `accessKey=secretkey123`
+**Nota:** Para criar o primeiro usuário administrador, use o endpoint `/v1/admin/users` (veja seção de Administração).
 
 ### 2. Usar o Token
 
@@ -124,7 +144,7 @@ Authorization: Bearer {seu_token}
 
 ### 3. Validar Token
 
-**POST** `/v1/auth`
+**GET** `/v1/auth/validate` 🔒 *Requer autenticação*
 
 ```
 Authorization: Bearer {seu_token}
@@ -132,40 +152,100 @@ Authorization: Bearer {seu_token}
 
 ## 🔌 Endpoints da API
 
-### Chat com o Agente de IA
+### Chat com Histórico de Conversação
 
-**POST** `/v1/chat` 🔒 *Requer autenticação*
+**POST** `/v1/conversations/chat` 🔒 *Requer autenticação*
 
 ```json
 {
-  "message": "Qual é a capital do Brasil?",
+  "conversationId": "507f1f77bcf86cd799439011",
+  "message": "Continue nossa conversa sobre IA",
   "model": "llama3.2",
-  "temperature": 0.7
+  "temperature": 0.7,
+  "title": "Discussão sobre IA"
 }
 ```
 
 **Response:**
 ```json
 {
-  "response": "A capital do Brasil é Brasília...",
+  "conversationId": "507f1f77bcf86cd799439011",
+  "response": "Claro! Continuando nossa discussão...",
   "model": "llama3.2",
-  "tokensUsed": 150
+  "tokensUsed": 150,
+  "timestamp": "2024-11-24T10:30:00"
 }
 ```
 
-### Chat com Streaming (SSE)
+**Nota:** Se não fornecer `conversationId`, uma nova conversação será criada automaticamente.
 
-**POST** `/v1/chat/stream` 🔒 *Requer autenticação*
+### Listar Conversações
+
+**GET** `/v1/conversations` 🔒 *Requer autenticação*
+
+Retorna todas as conversações do usuário autenticado.
+
+**GET** `/v1/conversations?active=true` - Apenas conversações ativas
+
+### Obter Conversação Específica
+
+**GET** `/v1/conversations/{conversationId}` 🔒 *Requer autenticação*
+
+Retorna detalhes completos de uma conversação, incluindo todo o histórico de mensagens.
+
+### Atualizar Título da Conversação
+
+**PATCH** `/v1/conversations/{conversationId}/title` 🔒 *Requer autenticação*
 
 ```json
 {
-  "message": "Explique como funciona a inteligência artificial",
-  "model": "llama3.2",
-  "temperature": 0.7
+  "title": "Novo título da conversa"
 }
 ```
 
-**Response:** Server-Sent Events (SSE) - A resposta é enviada em tempo real, token por token.
+### Arquivar Conversação
+
+**PATCH** `/v1/conversations/{conversationId}/archive` 🔒 *Requer autenticação*
+
+Marca a conversação como inativa (arquivada).
+
+### Deletar Conversação
+
+**DELETE** `/v1/conversations/{conversationId}` 🔒 *Requer autenticação*
+
+Remove permanentemente a conversação e todo seu histórico.
+
+### Endpoints de Administração
+
+#### Criar Novo Usuário
+**POST** `/v1/admin/users` 🔒 *Requer ADMIN*
+
+```json
+{
+  "username": "johndoe",
+  "password": "senha123",
+  "email": "john@example.com",
+  "roles": ["USER"]
+}
+```
+
+#### Listar Todos os Usuários
+**GET** `/v1/admin/users` 🔒 *Requer ADMIN ou MODERATOR*
+
+#### Atualizar Roles de Usuário
+**PATCH** `/v1/admin/users/{username}/roles` 🔒 *Requer ADMIN*
+
+```json
+{
+  "roles": ["USER", "MODERATOR"]
+}
+```
+
+#### Desativar Usuário
+**DELETE** `/v1/admin/users/{username}` 🔒 *Requer ADMIN*
+
+#### Listar Conversações de Usuário Específico
+**GET** `/v1/admin/conversations/user/{username}` 🔒 *Requer ADMIN ou MODERATOR*
 
 ## 📦 Estrutura do Projeto
 
@@ -175,19 +255,34 @@ src/main/java/com/caio/ollama_integration/
 │   ├── OpenApiConfig.java         # Configuração Swagger/OpenAPI
 │   └── WebSecurityConfig.java     # Configuração Spring Security
 ├── controller/
+│   ├── AdminController.java       # Endpoints de administração
 │   ├── AuthController.java        # Endpoints de autenticação JWT
-│   └── ChatController.java        # Endpoints de chat com IA
+│   └── ConversationController.java # Endpoints de chat e histórico
 ├── dto/
-│   ├── AuthRequest.java           # DTO de login
+│   ├── AuthRequest.java           # DTO de login (username/password)
 │   ├── AuthResponse.java          # DTO de resposta JWT
-│   ├── ChatRequest.java           # DTO de requisição chat
-│   ├── ChatResponse.java          # DTO de resposta chat
-│   └── TokenValidationResponse.java  # DTO validação token
+│   ├── ConversationRequest.java   # DTO de requisição conversação
+│   ├── ConversationResponse.java  # DTO de resposta conversação
+│   ├── ConversationChatResponse.java # DTO de resposta chat
+│   ├── CreateUserRequest.java     # DTO para criar usuário
+│   ├── UserResponse.java          # DTO de resposta usuário
+│   └── UpdateRolesRequest.java    # DTO para atualizar roles
+├── model/
+│   ├── Conversation.java          # Entidade conversação (MongoDB)
+│   ├── Message.java               # Entidade mensagem
+│   ├── User.java                  # Entidade usuário (MongoDB)
+│   └── Role.java                  # Enum de roles
+├── repository/
+│   ├── ConversationRepository.java # Repository MongoDB
+│   └── UserRepository.java        # Repository de usuários
 ├── security/
 │   ├── JwtAuthenticationFilter.java  # Filtro de autenticação JWT
+│   ├── RequiresRole.java          # Anotação para controle de roles
+│   └── RoleCheckInterceptor.java  # Interceptor de verificação de roles
 │   └── JwtUtil.java               # Utilitário JWT (geração/validação)
 ├── service/
 │   ├── AuthService.java           # Lógica de autenticação
+│   ├── ConversationService.java   # Lógica de histórico
 │   └── OllamaService.java         # Lógica de integração com Ollama
 ├── util/
 │   ├── JwtUtil.java               # Utilitário de autenticação
@@ -224,6 +319,11 @@ docker-compose down -v
 - Verifique os logs: `docker logs ollama`
 - Teste a conexão: `curl http://localhost:11434/tags`
 
+### MongoDB não está acessível
+- Verifique se o container está rodando: `docker ps | findstr mongodb`
+- Verifique os logs: `docker logs mongodb`
+- Teste a conexão: `docker exec -it mongodb mongosh -u admin -p admin123`
+
 ### Modelo não encontrado
 - Liste os modelos instalados: `docker exec -it ollama ollama list`
 - Baixe o modelo necessário: `docker exec -it ollama ollama pull llama3.2`
@@ -246,7 +346,8 @@ docker-compose down -v
 - [x] Configuração com variáveis de ambiente (.env)
 - [x] Autenticação baseada em subject/accessKey
 - [x] Adicionar streaming de respostas (SSE)
-- [ ] Implementar histórico de conversação com banco de dados
+- [x] Implementar histórico de conversação com banco de dados
+- [x] Sistema completo de roles e permissões (USER, MODERATOR, ADMIN)
 - [ ] Adicionar suporte a embeddings
 - [ ] Implementar RAG (Retrieval-Augmented Generation)
 - [ ] Sistema de roles e permissões granular

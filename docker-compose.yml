@@ -20,14 +20,30 @@ services:
       - |
         /bin/ollama serve &
         sleep 5
-        ollama pull llama3.1:latest &
+        ollama pull llama3.2:latest &
         ollama pull deepseek-coder:latest &
         ollama pull mixtral:latest &
         ollama pull deepseek-r1:latest &
         wait
 
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+    networks:
+      - ollama-network
+
 volumes:
   ollama_data:
+    driver: local
+  mongodb_data:
     driver: local
 
 networks:

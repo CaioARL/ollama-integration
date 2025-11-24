@@ -1,6 +1,7 @@
 package com.caio.ollama_integration.security;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Collections;
 
 import org.springframework.lang.NonNull;
@@ -13,7 +14,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.caio.ollama_integration.config.WebSecurityConfig;
 import com.caio.ollama_integration.util.JwtUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(
@@ -60,10 +64,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     log.debug("Usuário '{}' autenticado com sucesso", username);
                 }
             }
-        } catch (Exception e) {
-            log.error("Erro ao processar token JWT: ", e);
-        }
 
-        filterChain.doFilter(request, response);
+            filterChain.doFilter(request, response);
+        } catch (ExpiredJwtException e) {
+            String message = String.format("Seu token de acesso expirou em: %s, por favor, faça login novamente.",
+                    e.getClaims().getExpiration());
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token Expired", message);
+        } catch (Exception e) {
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized",
+                    "Token inválido ou malformado");
+        }
+    }
+
+    private void sendErrorResponse(HttpServletResponse response, int status, String error, String message)
+            throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        var errorResponse = new java.util.HashMap<String, Object>();
+        errorResponse.put("status", status);
+        errorResponse.put("error", error);
+        errorResponse.put("message", message);
+        errorResponse.put("timestamp", LocalDateTime.now().toString());
+
+        response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+        response.getWriter().flush();
     }
 }

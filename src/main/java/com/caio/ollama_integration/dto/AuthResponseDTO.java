@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,6 +24,9 @@ public class AuthResponseDTO {
 
     @Schema(description = "Subject autenticado", example = "myapp")
     private String username;
+
+    @Schema(description = "Roles do usuário", example = "[\"USER\", \"ADMIN\"]")
+    private List<String> roles;
 
     @Schema(description = "Tempo de expiração em milissegundos", example = "3600000")
     private Long expiresIn;

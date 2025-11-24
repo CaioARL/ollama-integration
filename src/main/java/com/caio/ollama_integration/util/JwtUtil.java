@@ -1,18 +1,21 @@
 package com.caio.ollama_integration.util;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
 
 @Slf4j
 @Component
@@ -42,6 +45,12 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
+    @SuppressWarnings("unchecked")
+    public List<String> extractRoles(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get("roles", List.class);
+    }
+
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
@@ -56,6 +65,12 @@ public class JwtUtil {
 
     public String generateToken(String username) {
         Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, username);
+    }
+
+    public String generateToken(String username, List<String> roles) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("roles", roles);
         return createToken(claims, username);
     }
 
@@ -77,22 +92,24 @@ public class JwtUtil {
     }
 
     public Boolean validateToken(String token, String username) {
-        try {
-            final String extractedUsername = extractUsername(token);
-            return (extractedUsername.equals(username) && !isTokenExpired(token));
-        } catch (Exception e) {
-            log.error("Erro ao validar token: ", e);
-            return false;
+        final String extractedUsername = extractUsername(token);
+
+        if (isTokenExpired(token)) {
+            throw new com.caio.ollama_integration.exception.TokenExpiredException(
+                    "Token expirado. Por favor, fa\u00e7a login novamente.");
         }
+
+        return extractedUsername.equals(username);
     }
 
     public Boolean validateToken(String token) {
-        try {
-            extractAllClaims(token);
-            return !isTokenExpired(token);
-        } catch (Exception e) {
-            log.error("Erro ao validar token: ", e);
-            return false;
+        extractAllClaims(token);
+
+        if (isTokenExpired(token)) {
+            throw new com.caio.ollama_integration.exception.TokenExpiredException(
+                    "Token expirado. Por favor, fa\u00e7a login novamente.");
         }
+
+        return true;
     }
 }

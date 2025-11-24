@@ -1,6 +1,7 @@
 package com.caio.ollama_integration.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,9 +12,11 @@ import lombok.NoArgsConstructor;
 @Schema(description = "Request para autenticação do usuário")
 public class AuthRequestDTO {
 
-    @Schema(description = "Subject do aplicativo", example = "myapp")
-    private String subject;
+    @NotBlank(message = "Username é obrigatório")
+    @Schema(description = "Nome de usuário", example = "admin")
+    private String username;
 
-    @Schema(description = "Chave de acesso (Access Key)", example = "secretkey123")
-    private String accessKey;
+    @NotBlank(message = "Senha é obrigatória")
+    @Schema(description = "Senha do usuário", example = "admin123")
+    private String password;
 }

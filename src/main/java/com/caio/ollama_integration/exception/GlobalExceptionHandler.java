@@ -109,7 +109,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleGenericException(
             Exception ex, WebRequest request) {
         log.error("Erro não tratado: {}", ex.getMessage(), ex);
-
         ErrorResponseDTO errorResponse = ErrorResponseDTO.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error("Internal Server Error")
