@@ -31,8 +31,8 @@ docker exec -it ollama ollama list
 Write-Host "`n🔨 Compilando projeto Spring Boot..." -ForegroundColor Cyan
 mvn clean install -DskipTests
 
-Write-Host "`n✅ Setup concluído!" -ForegroundColor Green
-Write-Host "`nPróximos passos:" -ForegroundColor Yellow
+Write-Host "`n✅ Setup concluido!" -ForegroundColor Green
+Write-Host "`nProximos passos:" -ForegroundColor Yellow
 Write-Host "1. Execute: mvn spring-boot:run"
 Write-Host "2. Acesse: http://localhost:8080/api/chat/health"
 Write-Host "3. Interface Web do Ollama: http://localhost:3000"

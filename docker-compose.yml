@@ -126,20 +126,17 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
     networks:
       - ollama-network
     restart: unless-stopped
     healthcheck:
-      test:
-        [
-          "CMD",
-          "kafka-broker-api-versions",
-          "--bootstrap-server",
-          "localhost:9092",
-        ]
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
 volumes:
   ollama_data:
