@@ -107,9 +107,20 @@ public class JwtUtil {
 
         if (isTokenExpired(token)) {
             throw new com.caio.ollama_integration.exception.TokenExpiredException(
-                    "Token expirado. Por favor, fa\u00e7a login novamente.");
+                    "Token expirado. Por favor, faça login novamente.");
         }
 
         return true;
+    }
+
+    /**
+     * Extrai o username do header Authorization
+     */
+    public String extractUsernameFromHeader(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Header Authorization inválido");
+        }
+        String token = authHeader.substring(7);
+        return extractUsername(token);
     }
 }

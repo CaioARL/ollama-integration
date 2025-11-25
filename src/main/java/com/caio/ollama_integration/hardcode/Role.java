@@ -1,4 +1,4 @@
-package com.caio.ollama_integration.model;
+package com.caio.ollama_integration.hardcode;
 
 public enum Role {
     USER, // Usuário comum - pode usar chat e gerenciar suas próprias conversações

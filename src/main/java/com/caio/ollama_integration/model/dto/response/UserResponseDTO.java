@@ -1,6 +1,5 @@
-package com.caio.ollama_integration.dto;
+package com.caio.ollama_integration.model.dto.response;
 
-import com.caio.ollama_integration.model.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+
+import com.caio.ollama_integration.hardcode.Role;
 
 @Data
 @Builder

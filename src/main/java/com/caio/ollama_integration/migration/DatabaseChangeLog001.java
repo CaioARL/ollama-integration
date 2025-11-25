@@ -1,6 +1,6 @@
 package com.caio.ollama_integration.migration;
 
-import com.caio.ollama_integration.model.Role;
+import com.caio.ollama_integration.hardcode.Role;
 import com.caio.ollama_integration.model.User;
 import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;

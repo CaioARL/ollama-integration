@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.caio.ollama_integration.dto.AuthRequestDTO;
-import com.caio.ollama_integration.dto.AuthResponseDTO;
+import com.caio.ollama_integration.model.dto.request.AuthRequestDTO;
+import com.caio.ollama_integration.model.dto.response.AuthResponseDTO;
 import com.caio.ollama_integration.service.AuthService;
 
 import io.swagger.v3.oas.annotations.Operation;

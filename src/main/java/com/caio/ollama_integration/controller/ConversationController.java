@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.caio.ollama_integration.dto.ConversationRequestDTO;
-import com.caio.ollama_integration.dto.ConversationResponseDTO;
-import com.caio.ollama_integration.dto.ModelsListResponseDTO;
+import com.caio.ollama_integration.model.dto.request.ConversationRequestDTO;
+import com.caio.ollama_integration.model.dto.response.ConversationResponseDTO;
+import com.caio.ollama_integration.model.dto.response.ModelsListResponseDTO;
 import com.caio.ollama_integration.service.ConversationService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -111,6 +111,17 @@ public class ConversationController {
         log.info("Listando conversações do modelo: {} do usuário: {}", model, username);
 
         return ResponseEntity.ok(conversationService.listConversationsByModel(username, model));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Buscar conversações semanticamente", description = "Busca conversações similares à query usando embeddings vetoriais")
+    public ResponseEntity<List<ConversationResponseDTO>> searchConversations(
+            @Parameter(description = "Texto da busca semântica") @RequestParam String query,
+            @Parameter(description = "Número máximo de resultados") @RequestParam(defaultValue = "5") int limit,
+            @AuthenticationPrincipal String username) {
+        log.info("Busca semântica de conversações para usuário: {} com query: {}", username, query);
+
+        return ResponseEntity.ok(conversationService.searchSimilarConversations(username, query, limit));
     }
 
     @PatchMapping("/{conversationId}/title")

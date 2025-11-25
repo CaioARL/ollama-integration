@@ -8,6 +8,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.caio.ollama_integration.hardcode.Role;
+
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;

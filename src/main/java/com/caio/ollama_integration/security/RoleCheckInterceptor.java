@@ -1,6 +1,6 @@
 package com.caio.ollama_integration.security;
 
-import com.caio.ollama_integration.model.Role;
+import com.caio.ollama_integration.hardcode.Role;
 import com.caio.ollama_integration.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

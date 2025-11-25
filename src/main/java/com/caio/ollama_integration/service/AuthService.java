@@ -9,11 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.caio.ollama_integration.dto.AuthResponseDTO;
 import com.caio.ollama_integration.exception.AuthenticationException;
 import com.caio.ollama_integration.exception.InvalidRequestException;
-import com.caio.ollama_integration.model.Role;
+import com.caio.ollama_integration.hardcode.Role;
 import com.caio.ollama_integration.model.User;
+import com.caio.ollama_integration.model.dto.response.AuthResponseDTO;
 import com.caio.ollama_integration.repository.UserRepository;
 import com.caio.ollama_integration.util.JwtUtil;
 

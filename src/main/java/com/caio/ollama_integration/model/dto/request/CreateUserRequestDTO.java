@@ -1,6 +1,5 @@
-package com.caio.ollama_integration.dto;
+package com.caio.ollama_integration.model.dto.request;
 
-import com.caio.ollama_integration.model.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -11,6 +10,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.Set;
+
+import com.caio.ollama_integration.hardcode.Role;
 
 @Data
 @Builder

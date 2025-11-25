@@ -10,9 +10,9 @@ import org.springframework.ai.ollama.api.OllamaApi.ListModelResponse;
 import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.stereotype.Service;
 
-import com.caio.ollama_integration.dto.ModelResponseDTO;
-import com.caio.ollama_integration.dto.ModelsListResponseDTO;
 import com.caio.ollama_integration.exception.OllamaServiceException;
+import com.caio.ollama_integration.model.dto.response.ModelResponseDTO;
+import com.caio.ollama_integration.model.dto.response.ModelsListResponseDTO;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

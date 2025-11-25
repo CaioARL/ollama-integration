@@ -21,21 +21,33 @@ Isso irá:
 - Iniciar o MongoDB na porta `27017`
 - Configurar automaticamente o banco de dados para histórico de conversações
 
-### 2. Baixar um modelo LLM
+### 2. Baixar modelos
 
-Acesse o container do Ollama e baixe um modelo:
+Acesse o container do Ollama e baixe os modelos necessários:
 
+**Modelo LLM para chat:**
 ```bash
 docker exec -it ollama ollama pull llama3.2
 ```
 
-Outros modelos disponíveis:
-- `llama3.2` (recomendado, ~2GB)
-- `llama3.2:1b` (menor, ~1.3GB)
-- `mistral` (~4GB)
-- `codellama` (especializado em código)
+**Modelo de embeddings para busca semântica:**
+```bash
+docker exec -it ollama ollama pull all-minilm
+```
 
-Para listar modelos disponíveis:
+Outros modelos disponíveis:
+- **LLM (Chat):**
+  - `llama3.2` (recomendado, ~2GB)
+  - `llama3.2:1b` (menor, ~1.3GB)
+  - `mistral` (~4GB)
+  - `codellama` (especializado em código)
+
+- **Embeddings (Busca Semântica):**
+  - `all-minilm` (rápido, ~25MB)
+  - `nomic-embed-text` (melhor qualidade, ~274MB)
+  - `mxbai-embed-large` (alta qualidade, ~670MB)
+
+Para listar modelos instalados:
 ```bash
 docker exec -it ollama ollama list
 ```
@@ -74,6 +86,7 @@ SERVER_SERVLET_CONTEXT_PATH=/ollama-integration
 
 # Configurações do Ollama
 OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_EMBEDDING_MODEL=all-minilm
 
 # Configurações MongoDB
 MONGODB_URI=mongodb://admin:admin123@localhost:27017/ollama_chat?authSource=admin
@@ -215,6 +228,52 @@ Marca a conversação como inativa (arquivada).
 
 Remove permanentemente a conversação e todo seu histórico.
 
+### Buscar Conversações Semanticamente
+
+**GET** `/v1/conversations/search?query={texto}&limit={numero}` 🔒 *Requer autenticação*
+
+Busca conversações anteriores semanticamente similares à query usando embeddings vetoriais.
+
+**Parâmetros:**
+- `query`: Texto da busca (ex: "conversas sobre inteligência artificial")
+- `limit`: Número máximo de resultados (padrão: 5)
+
+## 🤖 RAG (Retrieval-Augmented Generation) Automático
+
+O sistema implementa **RAG automaticamente** em todas as conversações! Quando você faz uma pergunta:
+
+1. **🔍 Busca Inteligente**: O sistema busca automaticamente conversações e informações anteriores relevantes
+2. **📚 Contexto Enriquecido**: Adiciona o contexto encontrado ao prompt da IA (invisível para você)
+3. **💡 Respostas Melhores**: A IA responde baseada no histórico e conhecimento acumulado
+4. **📝 Auto-Indexação**: Cada conversação é automaticamente indexada para buscas futuras
+
+**Exemplo Prático:**
+
+```bash
+# 1ª Conversa - você ensina algo à IA
+POST /v1/conversations/abc123/chat
+{
+  "message": "Spring Boot usa anotações como @RestController para criar APIs REST"
+}
+
+# 2ª Conversa - semanas depois, em outra conversação
+POST /v1/conversations/xyz789/chat
+{
+  "message": "Como criar uma API REST em Java?"
+}
+
+# A IA automaticamente:
+# - Busca a conversa anterior sobre Spring Boot
+# - Usa como contexto
+# - Responde: "Você pode usar Spring Boot com @RestController..."
+```
+
+**Benefícios:**
+- ✅ **Memória de longo prazo**: A IA "lembra" de conversas anteriores
+- ✅ **Zero configuração**: Funciona automaticamente, sem ação do usuário
+- ✅ **Aprendizado contínuo**: Quanto mais você usa, mais inteligente fica
+- ✅ **Privacidade**: Cada usuário tem sua própria base de conhecimento
+
 ### Endpoints de Administração
 
 #### Criar Novo Usuário
@@ -252,28 +311,34 @@ Remove permanentemente a conversação e todo seu histórico.
 ```
 src/main/java/com/caio/ollama_integration/
 ├── config/
+│   ├── EmbeddingConfig.java       # Configuração de modelo de embeddings
 │   ├── OpenApiConfig.java         # Configuração Swagger/OpenAPI
 │   └── WebSecurityConfig.java     # Configuração Spring Security
 ├── controller/
 │   ├── AdminController.java       # Endpoints de administração
 │   ├── AuthController.java        # Endpoints de autenticação JWT
-│   └── ConversationController.java # Endpoints de chat e histórico
+│   └── ConversationController.java # Endpoints de chat com RAG integrado
 ├── dto/
 │   ├── AuthRequest.java           # DTO de login (username/password)
 │   ├── AuthResponse.java          # DTO de resposta JWT
 │   ├── ConversationRequest.java   # DTO de requisição conversação
 │   ├── ConversationResponse.java  # DTO de resposta conversação
 │   ├── ConversationChatResponse.java # DTO de resposta chat
+│   ├── CreateDocumentRequest.java # DTO para criar documento
 │   ├── CreateUserRequest.java     # DTO para criar usuário
+│   ├── DocumentResponse.java      # DTO de resposta documento
+│   ├── SemanticSearchRequest.java # DTO para busca semântica
 │   ├── UserResponse.java          # DTO de resposta usuário
 │   └── UpdateRolesRequest.java    # DTO para atualizar roles
 ├── model/
 │   ├── Conversation.java          # Entidade conversação (MongoDB)
+│   ├── Document.java              # Entidade documento com embeddings
 │   ├── Message.java               # Entidade mensagem
 │   ├── User.java                  # Entidade usuário (MongoDB)
 │   └── Role.java                  # Enum de roles
 ├── repository/
 │   ├── ConversationRepository.java # Repository MongoDB
+│   ├── DocumentRepository.java    # Repository de documentos
 │   └── UserRepository.java        # Repository de usuários
 ├── security/
 │   ├── JwtAuthenticationFilter.java  # Filtro de autenticação JWT
@@ -282,7 +347,8 @@ src/main/java/com/caio/ollama_integration/
 │   └── JwtUtil.java               # Utilitário JWT (geração/validação)
 ├── service/
 │   ├── AuthService.java           # Lógica de autenticação
-│   ├── ConversationService.java   # Lógica de histórico
+│   ├── ConversationService.java   # Lógica de chat com RAG automático
+│   ├── EmbeddingService.java      # Lógica de embeddings e busca semântica (interno)
 │   └── OllamaService.java         # Lógica de integração com Ollama
 ├── util/
 │   ├── JwtUtil.java               # Utilitário de autenticação
@@ -327,9 +393,59 @@ docker-compose down -v
 ### Modelo não encontrado
 - Liste os modelos instalados: `docker exec -it ollama ollama list`
 - Baixe o modelo necessário: `docker exec -it ollama ollama pull llama3.2`
+- Para embeddings: `docker exec -it ollama ollama pull all-minilm`
+
+### Erro ao gerar embeddings
+- Certifique-se de que o modelo de embeddings está instalado
+- Verifique a configuração `OLLAMA_EMBEDDING_MODEL` no `.env`
+- Teste: `docker exec -it ollama ollama run all-minilm "test"`
 
 ### Porta já em uso
 - Altere a porta em `docker-compose.yml` ou `application.properties`
+
+## 💡 Exemplos de Uso do RAG Automático
+
+### Cenário 1: Ensinando à IA
+
+```bash
+# Primeira conversa - você compartilha conhecimento
+curl -X POST http://localhost:8080/ollama-integration/v1/conversations/abc123/chat \
+  -H "Authorization: Bearer {seu_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "No Spring Boot, usamos @RestController para APIs REST e @Service para lógica de negócio",
+    "model": "llama3.2"
+  }'
+
+# Sistema automaticamente indexa esta conversa para buscas futuras
+```
+
+### Cenário 2: IA com Memória
+
+```bash
+# Dias depois, nova conversa - a IA lembra!
+curl -X POST http://localhost:8080/ollama-integration/v1/conversations/xyz789/chat \
+  -H "Authorization: Bearer {seu_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Quais anotações do Spring devo usar para criar uma API?",
+    "model": "llama3.2"
+  }'
+
+# Sistema:
+# 1. Busca conversas anteriores sobre "Spring" e "API"
+# 2. Encontra sua conversa anterior
+# 3. Adiciona ao contexto automaticamente
+# 4. IA responde: "Com base em nossa conversa anterior, use @RestController..."
+```
+
+### Cenário 3: Buscar Conversas Anteriores
+
+```bash
+# Encontrar conversas sobre um tema específico
+curl -X GET "http://localhost:8080/ollama-integration/v1/conversations/search?query=spring%20boot%20apis&limit=5" \
+  -H "Authorization: Bearer {seu_token}"
+```
 
 ## 📚 Recursos
 
@@ -338,6 +454,42 @@ docker-compose down -v
 - [Swagger/OpenAPI Specification](https://swagger.io/specification/)
 - [Ollama Models](https://ollama.ai/library)
 - [Open WebUI](https://github.com/open-webui/open-webui)
+
+## 🧠 Como Funciona o RAG Automático
+
+O sistema usa **embeddings vetoriais** para implementar RAG de forma transparente:
+
+### Fluxo Automático
+
+```
+1. Você envia mensagem → "Como usar Spring Boot?"
+
+2. Sistema busca contexto relevante:
+   ┌─────────────────────────────────┐
+   │ Embedding da sua pergunta       │
+   │ ↓                               │
+   │ Busca em conversas anteriores   │
+   │ ↓                               │
+   │ Top 3 documentos similares      │
+   └─────────────────────────────────┘
+
+3. Monta prompt enriquecido:
+   ┌──────────────────────────────────────────┐
+   │ Contexto: [conversas anteriores]        │
+   │ Pergunta: Como usar Spring Boot?        │
+   └──────────────────────────────────────────┘
+
+4. IA responde com contexto ← Você só vê isso
+
+5. Sistema auto-indexa a conversa para futuras buscas
+```
+
+### Tecnologia
+
+- **Embedding Model**: `all-minilm` (Ollama)
+- **Busca Semântica**: Similaridade cosseno
+- **Auto-Indexação**: Toda conversa vira documento pesquisável
+- **Privacidade**: Dados isolados por usuário
 
 ## 🎯 Próximos Passos
 
@@ -348,9 +500,11 @@ docker-compose down -v
 - [x] Adicionar streaming de respostas (SSE)
 - [x] Implementar histórico de conversação com banco de dados
 - [x] Sistema completo de roles e permissões (USER, MODERATOR, ADMIN)
-- [ ] Adicionar suporte a embeddings
-- [ ] Implementar RAG (Retrieval-Augmented Generation)
-- [ ] Sistema de roles e permissões granular
+- [x] Adicionar suporte a embeddings e busca semântica
+- [x] Implementar RAG (Retrieval-Augmented Generation) automático
+- [x] Indexação automática de conversações como documentos
+- [ ] Upload e processamento de arquivos PDF/TXT para base de conhecimento
+- [ ] Ajuste de relevância RAG (threshold de similaridade configurável)
 - [ ] Rate limiting por usuário
 - [ ] Métricas e monitoramento (Actuator)
-- [ ] Rotação automática de access keys
+- [ ] MongoDB Atlas Vector Search (para produção em escala)

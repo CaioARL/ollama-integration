@@ -21,9 +21,7 @@ services:
         /bin/ollama serve &
         sleep 5
         ollama pull llama3.2:latest &
-        ollama pull deepseek-coder:latest &
-        ollama pull mixtral:latest &
-        ollama pull deepseek-r1:latest &
+        ollama pull omxbai-embed-large:latest &
         wait
 
   mongodb:

@@ -1,4 +1,4 @@
-package com.caio.ollama_integration.dto;
+package com.caio.ollama_integration.model.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;

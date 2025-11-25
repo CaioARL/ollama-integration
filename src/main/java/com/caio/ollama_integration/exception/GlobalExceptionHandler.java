@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
-import com.caio.ollama_integration.dto.ErrorResponseDTO;
+import com.caio.ollama_integration.model.dto.response.ErrorResponseDTO;
 
 import lombok.extern.slf4j.Slf4j;
 

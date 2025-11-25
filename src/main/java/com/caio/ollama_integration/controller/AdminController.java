@@ -17,11 +17,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.caio.ollama_integration.dto.CreateUserRequestDTO;
-import com.caio.ollama_integration.dto.UpdateRolesRequestDTO;
-import com.caio.ollama_integration.dto.UserResponseDTO;
-import com.caio.ollama_integration.model.Role;
+import com.caio.ollama_integration.hardcode.Role;
 import com.caio.ollama_integration.model.User;
+import com.caio.ollama_integration.model.dto.request.CreateUserRequestDTO;
+import com.caio.ollama_integration.model.dto.response.UpdateRolesRequestDTO;
+import com.caio.ollama_integration.model.dto.response.UserResponseDTO;
 import com.caio.ollama_integration.security.RequiresRole;
 import com.caio.ollama_integration.service.AuthService;
 import com.caio.ollama_integration.service.ConversationService;

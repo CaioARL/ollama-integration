@@ -8,12 +8,12 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.caio.ollama_integration.dto.ConversationRequestDTO;
-import com.caio.ollama_integration.dto.ConversationResponseDTO;
-import com.caio.ollama_integration.dto.ModelsListResponseDTO;
 import com.caio.ollama_integration.exception.InvalidRequestException;
-import com.caio.ollama_integration.model.Conversation;
 import com.caio.ollama_integration.model.Message;
+import com.caio.ollama_integration.model.dto.request.ConversationRequestDTO;
+import com.caio.ollama_integration.model.dto.response.ConversationResponseDTO;
+import com.caio.ollama_integration.model.dto.response.ModelsListResponseDTO;
+import com.caio.ollama_integration.model.mongodb.Conversation;
 import com.caio.ollama_integration.repository.ConversationRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +27,7 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final OllamaService ollamaService;
+    private final EmbeddingService embeddingService;
 
     /**
      * Lista todos os modelos disponíveis no Ollama
@@ -80,6 +81,7 @@ public class ConversationService {
 
     /**
      * Adiciona mensagem à conversação e obtém resposta do LLM com streaming
+     * Implementa RAG: busca automaticamente contexto relevante antes de responder
      */
     public Flux<String> chatWithConversationStream(String conversationId, ConversationRequestDTO request,
             String username) {
@@ -95,12 +97,16 @@ public class ConversationService {
         Conversation conversation = getConversationById(conversationId, username);
         log.info("Usando conversação existente: {}", conversation.getId());
 
-        // Adiciona mensagem do usuário
+        // RAG: Busca documentos relevantes para enriquecer o contexto
+        String enhancedMessage = buildRAGEnhancedMessage(request.getMessage(), username);
+
+        // Adiciona mensagem do usuário (original, sem o contexto RAG)
         conversation.getMessages().add(Message.builder()
                 .role("user")
                 .content(request.getMessage())
                 .timestamp(LocalDateTime.now())
                 .build());
+
         // Atualiza título se necessário
         if (conversation.getTitle() == null || conversation.getTitle().isBlank() ||
                 conversation.getTitle().equals("Novo CHAT")) {
@@ -112,8 +118,8 @@ public class ConversationService {
         // Cria referência atômica para acumular a resposta completa
         AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
 
-        // Retorna o streaming puro da resposta
-        return ollamaService.chatStream(request.getMessage(), request.getModel(), request.getTemperature())
+        // Retorna o streaming puro da resposta (usa a mensagem enriquecida com RAG)
+        return ollamaService.chatStream(enhancedMessage, request.getModel(), request.getTemperature())
                 .doOnNext(chunk -> fullResponse.get().append(chunk))
                 .doOnComplete(() -> {
                     // Salva a resposta completa do assistente
@@ -132,9 +138,85 @@ public class ConversationService {
                     conv.setUpdatedAt(LocalDateTime.now());
                     conversationRepository.save(conv);
 
+                    // Auto-indexa a conversação para buscas futuras
+                    indexConversationAsDocument(conv);
+
                     log.info("Conversação atualizada com streaming: {}", conversationId);
                 })
                 .doOnError(error -> log.error("Erro no streaming da conversação: ", error));
+    }
+
+    /**
+     * Constrói mensagem enriquecida com contexto RAG
+     * Busca documentos relevantes e adiciona ao prompt
+     */
+    private String buildRAGEnhancedMessage(String userMessage, String username) {
+        try {
+            log.debug("Buscando contexto RAG para: {}", userMessage);
+
+            // Busca top 3 documentos mais relevantes
+            List<com.caio.ollama_integration.model.mongodb.EmbeddingDocument> relevantDocs = embeddingService
+                    .searchSimilarDocuments(userMessage, username, null, 3);
+
+            if (relevantDocs.isEmpty()) {
+                log.debug("Nenhum documento relevante encontrado, usando mensagem original");
+                return userMessage;
+            }
+
+            // Constrói contexto a partir dos documentos encontrados
+            StringBuilder context = new StringBuilder();
+            context.append("Contexto relevante encontrado:\n\n");
+
+            for (int i = 0; i < relevantDocs.size(); i++) {
+                com.caio.ollama_integration.model.mongodb.EmbeddingDocument doc = relevantDocs.get(i);
+                context.append(String.format("[Documento %d]\n%s\n\n", i + 1, doc.getContent()));
+            }
+
+            context.append("---\n\n");
+            context.append("Com base no contexto acima, responda à seguinte pergunta:\n");
+            context.append(userMessage);
+
+            log.info("Mensagem enriquecida com {} documentos relevantes", relevantDocs.size());
+            return context.toString();
+
+        } catch (Exception e) {
+            log.warn("Erro ao buscar contexto RAG, usando mensagem original: {}", e.getMessage());
+            return userMessage;
+        }
+    }
+
+    /**
+     * Indexa conversação como documento para buscas semânticas futuras
+     */
+    private void indexConversationAsDocument(Conversation conversation) {
+        try {
+            log.debug("Indexando conversação: {}", conversation.getId());
+
+            // Concatena todas as mensagens em um texto
+            String conversationText = conversation.getMessages().stream()
+                    .map(msg -> msg.getRole() + ": " + msg.getContent())
+                    .collect(Collectors.joining("\n"));
+
+            // Metadados da conversação
+            java.util.Map<String, Object> metadata = new java.util.HashMap<>();
+            metadata.put("conversationId", conversation.getId());
+            metadata.put("title", conversation.getTitle());
+            metadata.put("model", conversation.getModel());
+            metadata.put("messageCount", conversation.getMessages().size());
+
+            // Cria embedding do documento
+            embeddingService.createDocument(
+                    conversationText,
+                    metadata,
+                    conversation.getUsername(),
+                    "conversation");
+
+            log.info("Conversação {} indexada com sucesso", conversation.getId());
+
+        } catch (Exception e) {
+            log.error("Erro ao indexar conversação: {}", e.getMessage(), e);
+            // Não propaga erro para não afetar o fluxo principal
+        }
     }
 
     /**
@@ -187,6 +269,37 @@ public class ConversationService {
                 .findByUsernameAndModelOrderByUpdatedAtDesc(username, model);
 
         return conversations.stream()
+                .map(this::toResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Busca conversações semanticamente similares usando embeddings
+     */
+    public List<ConversationResponseDTO> searchSimilarConversations(String username, String query, int limit) {
+        log.info("Buscando conversações similares para usuário: {} com query: {}", username, query);
+
+        // Busca documentos de conversações similares
+        List<com.caio.ollama_integration.model.mongodb.EmbeddingDocument> similarDocs = embeddingService
+                .searchSimilarDocuments(query, username, "conversation", limit);
+
+        // Extrai IDs de conversações dos documentos
+        List<String> conversationIds = similarDocs.stream()
+                .map(doc -> (String) doc.getMetadata().get("conversationId"))
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Busca as conversações pelos IDs
+        List<Conversation> conversations = conversationRepository.findAllById(conversationIds);
+
+        // Ordena pela ordem dos IDs retornados pela busca semântica
+        return conversationIds.stream()
+                .map(id -> conversations.stream()
+                        .filter(conv -> conv.getId().equals(id))
+                        .findFirst()
+                        .orElse(null))
+                .filter(conv -> conv != null)
                 .map(this::toResponseDTO)
                 .collect(Collectors.toList());
     }
