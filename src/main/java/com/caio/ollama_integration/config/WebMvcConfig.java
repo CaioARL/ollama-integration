@@ -2,6 +2,7 @@ package com.caio.ollama_integration.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -20,5 +21,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(roleCheckInterceptor)
                 .addPathPatterns("/v1/**")
                 .excludePathPatterns("/v1/auth/**");
+    }
+
+    @Override
+    public void addCorsMappings(@NonNull CorsRegistry registry) {
+        registry.addMapping("/swagger-ui/**").allowedOrigins("*");
     }
 }

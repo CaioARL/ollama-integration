@@ -1,10 +1,13 @@
 package com.caio.ollama_integration.service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +17,7 @@ import com.caio.ollama_integration.model.dto.request.ConversationRequestDTO;
 import com.caio.ollama_integration.model.dto.response.ConversationResponseDTO;
 import com.caio.ollama_integration.model.dto.response.ModelsListResponseDTO;
 import com.caio.ollama_integration.model.mongodb.Conversation;
+import com.caio.ollama_integration.model.mongodb.EmbeddingDocument;
 import com.caio.ollama_integration.repository.ConversationRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,12 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final OllamaService ollamaService;
     private final EmbeddingService embeddingService;
+
+    @Value("${app.similarity.rag-threshold:0.70}")
+    private double ragSimilarityThreshold;
+
+    @Value("${app.similarity.conversation-threshold:0.60}")
+    private double conversationSimilarityThreshold;
 
     /**
      * Lista todos os modelos disponíveis no Ollama
@@ -149,26 +159,26 @@ public class ConversationService {
     /**
      * Constrói mensagem enriquecida com contexto RAG
      * Busca documentos relevantes e adiciona ao prompt
+     * Aplica threshold de similaridade mínima para evitar contexto irrelevante
      */
     private String buildRAGEnhancedMessage(String userMessage, String username) {
         try {
             log.debug("Buscando contexto RAG para: {}", userMessage);
 
-            // Busca top 3 documentos mais relevantes
-            List<com.caio.ollama_integration.model.mongodb.EmbeddingDocument> relevantDocs = embeddingService
-                    .searchSimilarDocuments(userMessage, username, null, 3);
+            // Busca top 3 documentos mais relevantes (usa threshold do properties)
+            List<EmbeddingDocument> relevantDocs = embeddingService
+                    .searchSimilarDocuments(userMessage, username, null, 3, ragSimilarityThreshold);
 
             if (relevantDocs.isEmpty()) {
-                log.debug("Nenhum documento relevante encontrado, usando mensagem original");
+                log.debug("Nenhum documento relevante encontrado (threshold: {}), usando mensagem original",
+                        ragSimilarityThreshold);
                 return userMessage;
-            }
-
-            // Constrói contexto a partir dos documentos encontrados
+            } // Constrói contexto a partir dos documentos encontrados
             StringBuilder context = new StringBuilder();
             context.append("Contexto relevante encontrado:\n\n");
 
             for (int i = 0; i < relevantDocs.size(); i++) {
-                com.caio.ollama_integration.model.mongodb.EmbeddingDocument doc = relevantDocs.get(i);
+                EmbeddingDocument doc = relevantDocs.get(i);
                 context.append(String.format("[Documento %d]\n%s\n\n", i + 1, doc.getContent()));
             }
 
@@ -198,14 +208,14 @@ public class ConversationService {
                 .collect(Collectors.joining("\n"));
 
         // Metadados da conversação
-        java.util.Map<String, Object> metadata = new java.util.HashMap<>();
+        Map<String, Object> metadata = new HashMap<>();
         metadata.put("conversationId", conversation.getId());
         metadata.put("title", conversation.getTitle());
         metadata.put("model", conversation.getModel());
         metadata.put("messageCount", conversation.getMessages().size());
 
         // Enfileira no Kafka para processamento distribuído
-                embeddingService.createDocumentAsync(
+        embeddingService.createDocumentAsync(
                 conversationText,
                 metadata,
                 conversation.getUsername(),
@@ -279,9 +289,9 @@ public class ConversationService {
     public List<ConversationResponseDTO> searchSimilarConversations(String username, String query, int limit) {
         log.info("Buscando conversações similares para usuário: {} com query: {}", username, query);
 
-        // Busca documentos de conversações similares
-        List<com.caio.ollama_integration.model.mongodb.EmbeddingDocument> similarDocs = embeddingService
-                .searchSimilarDocuments(query, username, "conversation", limit);
+        // Busca documentos de conversações similares (usa threshold do properties)
+        List<EmbeddingDocument> similarDocs = embeddingService
+                .searchSimilarDocuments(query, username, "conversation", limit, conversationSimilarityThreshold);
 
         // Extrai IDs de conversações dos documentos
         List<String> conversationIds = similarDocs.stream()
@@ -319,9 +329,40 @@ public class ConversationService {
                 .build();
     }
 
+    /**
+     * Estima número de tokens usando algoritmo mais preciso
+     * Baseado em padrões de tokenização de modelos GPT:
+     * - Palavras comuns: ~0.75 tokens por palavra
+     * - Pontuação e espaços: contados separadamente
+     * - Números e caracteres especiais: ~1 token cada
+     */
     private Integer estimateTokens(String text) {
-        // Estimativa simples: ~4 caracteres por token
-        return (int) Math.ceil(text.length() / 4.0);
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+
+        // Remove múltiplos espaços
+        String normalized = text.replaceAll("\\s+", " ").trim();
+
+        // Conta palavras (sequências alfanuméricas)
+        long wordCount = normalized.split("\\s+").length;
+
+        // Conta pontuação e caracteres especiais
+        long punctuationCount = normalized.chars()
+                .filter(ch -> !Character.isLetterOrDigit(ch) && !Character.isWhitespace(ch))
+                .count();
+
+        // Fórmula ajustada:
+        // - Palavras: 0.75 tokens por palavra (palavras comuns em português)
+        // - Pontuação: 0.5 tokens por caractere (alguns são agrupados)
+        // - Adiciona 10% de margem para casos especiais
+        double estimatedTokens = (wordCount * 0.75) + (punctuationCount * 0.5);
+        int finalEstimate = (int) Math.ceil(estimatedTokens * 1.1);
+
+        log.debug("Estimativa de tokens: {} palavras, {} pontuações = ~{} tokens",
+                wordCount, punctuationCount, finalEstimate);
+
+        return Math.max(1, finalEstimate); // Mínimo de 1 token
     }
 
 }

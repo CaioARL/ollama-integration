@@ -9,21 +9,6 @@ Backend Spring Boot para integração com Ollama (LLM local) usando Spring AI, c
 
 ## 🚀 Início Rápido (Docker)
 
-### Método 1: Script Automático
-
-**Windows (PowerShell):**
-```powershell
-.\start.ps1
-```
-
-**Linux/Mac:**
-```bash
-chmod +x start.sh
-./start.sh
-```
-
-### Método 2: Manual
-
 ```bash
 # Build e iniciar toda a stack
 docker-compose up -d --build
@@ -36,8 +21,6 @@ Isso irá iniciar:
 - 🤖 **Ollama** (porta 11434) - LLM local
 - 🍃 **MongoDB** (porta 27017) - Banco de dados
 - 📨 **Kafka** (porta 9092) - Fila de mensagens distribuída
-- 🔧 **Zookeeper** (porta 2181) - Coordenação Kafka
-- 🚀 **Aplicação** (porta 8080) - API REST
 
 ### 2. Baixar modelos
 

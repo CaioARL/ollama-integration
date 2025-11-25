@@ -15,6 +15,24 @@
             "type": "java.lang.String",
             "description": "Ollama embedding model to use for generating vector embeddings (e.g., all-minilm, nomic-embed-text).",
             "defaultValue": "all-minilm"
+        },
+        {
+            "name": "app.similarity.rag-threshold",
+            "type": "java.lang.Double",
+            "description": "Minimum similarity threshold for RAG context retrieval (0.0 to 1.0). Higher values = more precise, fewer documents.",
+            "defaultValue": 0.70
+        },
+        {
+            "name": "app.similarity.conversation-threshold",
+            "type": "java.lang.Double",
+            "description": "Minimum similarity threshold for conversation search (0.0 to 1.0). Can be less restrictive than RAG.",
+            "defaultValue": 0.60
+        },
+        {
+            "name": "app.similarity.default-threshold",
+            "type": "java.lang.Double",
+            "description": "Default minimum similarity threshold for general document searches (0.0 to 1.0).",
+            "defaultValue": 0.60
         }
     ]
 }

@@ -33,7 +33,7 @@ public class OpenApiConfig {
     @Value("${server.servlet.context-path}")
     private String contextPath;
 
-    @Value("${server.port:8080}")
+    @Value("${server.port}")
     private String serverPort;
 
     @Bean

@@ -1,24 +1,27 @@
 package com.caio.ollama_integration.service;
 
-import com.caio.ollama_integration.model.mongodb.EmbeddingDocument;
-import com.caio.ollama_integration.repository.DocumentRepository;
-import com.caio.ollama_integration.service.kafka.EmbeddingProducer;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.embedding.EmbeddingResponse;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/**
- * Serviço para gerenciar embeddings e busca semântica de documentos.
- * Utiliza modelos de embedding para converter texto em vetores.
- */
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.caio.ollama_integration.model.mongodb.EmbeddingDocument;
+import com.caio.ollama_integration.repository.DocumentRepository;
+import com.caio.ollama_integration.service.kafka.EmbeddingProducer;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,9 @@ public class EmbeddingService {
     private final DocumentRepository documentRepository;
     private final EmbeddingModel embeddingModel;
     private final EmbeddingProducer embeddingProducer;
+
+    @Value("${app.similarity.default-threshold:0.60}")
+    private double defaultSimilarityThreshold;
 
     /**
      * Gera embedding vetorial para um texto usando o modelo configurado
@@ -86,18 +92,20 @@ public class EmbeddingService {
     /**
      * Busca documentos semanticamente similares usando similaridade cosseno
      * 
-     * @param query        Texto da consulta
-     * @param username     Filtrar por usuário (null para buscar em todos)
-     * @param documentType Filtrar por tipo (null para buscar em todos)
-     * @param limit        Número máximo de resultados
+     * @param query         Texto da consulta
+     * @param username      Filtrar por usuário (null para buscar em todos)
+     * @param documentType  Filtrar por tipo (null para buscar em todos)
+     * @param limit         Número máximo de resultados
+     * @param minSimilarity Threshold mínimo de similaridade (0.0 a 1.0)
      * @return Lista de documentos ordenados por similaridade (maior primeiro)
      */
     public List<EmbeddingDocument> searchSimilarDocuments(String query, String username,
-            String documentType, int limit) {
-        log.info("Buscando documentos similares para query de {} caracteres", query.length());
+            String documentType, int limit, double minSimilarity) {
+        log.info("Buscando documentos similares para query de {} caracteres (threshold: {})",
+                query.length(), minSimilarity);
 
-        // Gera embedding da query
-        List<Double> queryEmbedding = generateEmbedding(query);
+        // Gera e normaliza embedding da query
+        List<Double> queryEmbedding = normalizeEmbedding(generateEmbedding(query));
 
         // Busca documentos candidatos
         List<EmbeddingDocument> candidates;
@@ -116,15 +124,24 @@ public class EmbeddingService {
             return Collections.emptyList();
         }
 
-        // Calcula similaridade cosseno e ordena
-        return candidates.stream()
+        log.debug("Avaliando {} documentos candidatos", candidates.size());
+
+        // Calcula similaridade cosseno, filtra por threshold e ordena
+        List<EmbeddingDocument> results = candidates.stream()
                 .map(doc -> {
-                    double similarity = cosineSimilarity(queryEmbedding, doc.getEmbedding());
+                    // Normaliza embedding do documento para melhor comparação
+                    List<Double> normalizedDocEmbedding = normalizeEmbedding(doc.getEmbedding());
+                    double similarity = cosineSimilarity(queryEmbedding, normalizedDocEmbedding);
+
                     // Adiciona score aos metadados temporariamente
                     Map<String, Object> metaWithScore = new HashMap<>(doc.getMetadata());
                     metaWithScore.put("_similarity_score", similarity);
                     doc.setMetadata(metaWithScore);
                     return doc;
+                })
+                .filter(doc -> {
+                    double score = (double) doc.getMetadata().get("_similarity_score");
+                    return score >= minSimilarity; // Aplica threshold
                 })
                 .sorted((d1, d2) -> {
                     double score1 = (double) d1.getMetadata().get("_similarity_score");
@@ -133,11 +150,57 @@ public class EmbeddingService {
                 })
                 .limit(limit)
                 .collect(Collectors.toList());
+
+        // Log dos resultados filtrados
+        if (results.isEmpty()) {
+            log.info("Nenhum documento passou o threshold de similaridade mínima: {}", minSimilarity);
+        } else {
+            log.info("Encontrados {} documentos relevantes (de {} candidatos)", results.size(), candidates.size());
+            results.forEach(doc -> {
+                double score = (double) doc.getMetadata().get("_similarity_score");
+                String docType = doc.getDocumentType();
+                String preview = doc.getContent().substring(0, Math.min(50, doc.getContent().length()));
+                log.debug("  → [{}] Score: {:.4f} - {}", docType, score, preview + "...");
+            });
+        }
+
+        return results;
     }
 
+    /**
+     * Sobrecarga para manter compatibilidade (usa threshold configurável do
+     * properties)
+     */
+    public List<EmbeddingDocument> searchSimilarDocuments(String query, String username,
+            String documentType, int limit) {
+        return searchSimilarDocuments(query, username, documentType, limit, defaultSimilarityThreshold);
+    }
 
     /**
-     * Calcula similaridade cosseno entre dois vetores
+     * Normaliza um vetor de embedding para ter magnitude 1
+     * Melhora a precisão do cálculo de similaridade cosseno
+     */
+    private List<Double> normalizeEmbedding(List<Double> embedding) {
+        // Calcula a magnitude do vetor
+        double magnitude = Math.sqrt(embedding.stream()
+                .mapToDouble(val -> val * val)
+                .sum());
+
+        // Evita divisão por zero
+        if (magnitude == 0.0) {
+            log.warn("Embedding com magnitude zero detectado, retornando original");
+            return embedding;
+        }
+
+        // Normaliza cada componente
+        return embedding.stream()
+                .map(val -> val / magnitude)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Calcula similaridade cosseno entre dois vetores (assumindo já normalizados)
+     * Retorna valor entre -1 e 1, onde 1 = idênticos, 0 = ortogonais, -1 = opostos
      */
     private double cosineSimilarity(List<Double> vec1, List<Double> vec2) {
         if (vec1.size() != vec2.size()) {

@@ -1,11 +1,6 @@
 package com.caio.ollama_integration.service.kafka;
 
-import com.caio.ollama_integration.model.kafka.EmbeddingRequestEvent;
-import com.caio.ollama_integration.model.kafka.EmbeddingResultEvent;
-import com.caio.ollama_integration.model.mongodb.EmbeddingDocument;
-import com.caio.ollama_integration.service.EmbeddingService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.Acknowledgment;
@@ -14,18 +9,25 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
-/**
- * Consumer Kafka para processar requisições de embedding
- * Escalável horizontalmente - pode rodar múltiplas instâncias
- */
+import com.caio.ollama_integration.model.kafka.EmbeddingRequestEvent;
+import com.caio.ollama_integration.model.kafka.EmbeddingResultEvent;
+import com.caio.ollama_integration.model.mongodb.EmbeddingDocument;
+import com.caio.ollama_integration.service.EmbeddingService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmbeddingConsumer {
 
+    @Value("${spring.kafka.producer.retries}")
+    private int maxRetryCount;
+
     private static final String REQUEST_TOPIC = "embedding-requests";
     private static final String RESULT_TOPIC = "embedding-results";
-    private static final String DLQ_TOPIC = "embedding-dlq"; // Dead Letter Queue
+    private static final String DLT_TOPIC = "embedding-dlt"; // Dead Letter Topic
 
     private final EmbeddingService embeddingService;
     private final KafkaTemplate<String, EmbeddingResultEvent> resultKafkaTemplate;
@@ -34,7 +36,7 @@ public class EmbeddingConsumer {
      * Processa requisições de embedding da fila Kafka
      * Múltiplas instâncias podem processar em paralelo
      */
-    @KafkaListener(topics = REQUEST_TOPIC, groupId = "${spring.kafka.consumer.group-id:embedding-service-group}", containerFactory = "embeddingRequestKafkaListenerContainerFactory")
+    @KafkaListener(topics = REQUEST_TOPIC, groupId = "${spring.kafka.consumer.group-id}", containerFactory = "embeddingRequestKafkaListenerContainerFactory")
     public void processEmbeddingRequest(
             @Payload EmbeddingRequestEvent event,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
@@ -75,14 +77,15 @@ public class EmbeddingConsumer {
             publishResult(event, null, false, e.getMessage(), processingTime);
 
             // Verifica se deve retentar ou enviar para DLQ
-            if (event.getRetryCount() != null && event.getRetryCount() >= 3) {
+            if (event.getRetryCount() != null && event.getRetryCount() >= maxRetryCount) {
                 log.error("[KAFKA CONSUMER] Evento {} excedeu tentativas, enviando para DLQ", event.getEventId());
                 sendToDLQ(event, e);
                 acknowledgment.acknowledge(); // Remove da fila principal
             } else {
                 // Não confirma para que seja reprocessado
-                log.warn("[KAFKA CONSUMER] Evento {} será reprocessado (tentativa {}/3)",
-                        event.getEventId(), (event.getRetryCount() != null ? event.getRetryCount() + 1 : 1));
+                log.warn("[KAFKA CONSUMER] Evento {} será reprocessado (tentativa {}/{})",
+                        event.getEventId(), (event.getRetryCount() != null ? event.getRetryCount() + 1 : 1),
+                        maxRetryCount);
                 // Incrementa contador de retry para próxima tentativa
                 event.setRetryCount(event.getRetryCount() != null ? event.getRetryCount() + 1 : 1);
             }
@@ -116,7 +119,7 @@ public class EmbeddingConsumer {
     }
 
     /**
-     * Envia evento para Dead Letter Queue
+     * Envia evento para Dead Letter Topic
      */
     private void sendToDLQ(EmbeddingRequestEvent event, Exception error) {
         try {
@@ -127,8 +130,8 @@ public class EmbeddingConsumer {
             event.getMetadata().put("dlq_reason", error.getMessage());
             event.getMetadata().put("dlq_timestamp", System.currentTimeMillis());
 
-            resultKafkaTemplate.send(DLQ_TOPIC, event.getUsername(),
-                    EmbeddingResultEvent.builder()
+            resultKafkaTemplate.send(DLT_TOPIC, event.getUsername(),
+                            EmbeddingResultEvent.builder()
                             .eventId(event.getEventId())
                             .username(event.getUsername())
                             .documentType(event.getDocumentType())
@@ -146,7 +149,7 @@ public class EmbeddingConsumer {
     /**
      * Listener opcional para monitorar resultados
      */
-    @KafkaListener(topics = RESULT_TOPIC, groupId = "${spring.kafka.consumer.group-id:embedding-service-group}-result", containerFactory = "embeddingResultKafkaListenerContainerFactory")
+    @KafkaListener(topics = RESULT_TOPIC, groupId = "${spring.kafka.consumer.group-id}-result", containerFactory = "embeddingResultKafkaListenerContainerFactory")
     public void monitorResults(@Payload EmbeddingResultEvent result) {
         if (result.isSuccess()) {
             log.info("[KAFKA MONITOR] ✓ Embedding concluído - evento: {}, docId: {}, tempo: {}ms",
