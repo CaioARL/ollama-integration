@@ -78,8 +78,8 @@ public class OllamaService {
      */
     public String generateConversationTitle(String firstMessage, String model) {
         try {
-            String prompt = String.format(
-                    "Crie um título curto e descritivo (máximo 5 palavras) para uma conversa que começa com esta mensagem: \"%s\". Retorne APENAS o título, sem aspas ou explicações.",
+            String prompt = "Crie um título curto e descritivo (máximo 5 palavras) para uma conversa que começa com esta mensagem: \"%s\". Retorne APENAS o título, sem aspas ou explicações."
+                    .formatted(
                     firstMessage.length() > 100 ? firstMessage.substring(0, 100) + "..." : firstMessage);
 
             OllamaOptions options = OllamaOptions.builder()
@@ -187,6 +187,6 @@ public class OllamaService {
             unitIndex++;
         }
 
-        return String.format("%.2f %s", size, units[unitIndex]);
+        return "%.2f %s".formatted(size, units[unitIndex]);
     }
 }

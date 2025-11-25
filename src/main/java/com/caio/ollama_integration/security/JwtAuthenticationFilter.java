@@ -67,7 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             filterChain.doFilter(request, response);
         } catch (ExpiredJwtException e) {
-            String message = String.format("Seu token de acesso expirou em: %s, por favor, faça login novamente.",
+            String message = "Seu token de acesso expirou em: %s, por favor, faça login novamente.".formatted(
                     e.getClaims().getExpiration());
             sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token Expired", message);
         } catch (Exception e) {
