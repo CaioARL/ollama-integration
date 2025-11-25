@@ -15,7 +15,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
@@ -92,11 +91,11 @@ public class WebSecurityConfig {
 	public static List<RequestMatcher> getPublicRequestMatchers() {
 		List<RequestMatcher> matchers = new ArrayList<>();
 		matchers.add(EndpointRequest.toAnyEndpoint());
-		matchers.add(new AntPathRequestMatcher("/actuator/**", null));
-		matchers.add(new RegexRequestMatcher("/v3/api-docs.*", null));
-		matchers.add(new RegexRequestMatcher("/api-docs.*", null));
-		matchers.add(new RegexRequestMatcher("/swagger.*", null));
-		matchers.add(new AntPathRequestMatcher("/v1/auth", HttpMethod.POST.name()));
+		matchers.add(RegexRequestMatcher.regexMatcher("/actuator/.*"));
+		matchers.add(RegexRequestMatcher.regexMatcher("/v3/api-docs.*"));
+		matchers.add(RegexRequestMatcher.regexMatcher("/api-docs.*"));
+		matchers.add(RegexRequestMatcher.regexMatcher("/swagger.*"));
+		matchers.add(RegexRequestMatcher.regexMatcher(HttpMethod.POST, "/v1/auth.*"));
 		return matchers;
 	}
 
