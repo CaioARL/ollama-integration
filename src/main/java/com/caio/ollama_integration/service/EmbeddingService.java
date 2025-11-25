@@ -2,6 +2,7 @@ package com.caio.ollama_integration.service;
 
 import com.caio.ollama_integration.model.mongodb.EmbeddingDocument;
 import com.caio.ollama_integration.repository.DocumentRepository;
+import com.caio.ollama_integration.service.kafka.EmbeddingProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -24,6 +26,7 @@ public class EmbeddingService {
 
     private final DocumentRepository documentRepository;
     private final EmbeddingModel embeddingModel;
+    private final EmbeddingProducer embeddingProducer;
 
     /**
      * Gera embedding vetorial para um texto usando o modelo configurado
@@ -66,6 +69,18 @@ public class EmbeddingService {
                 .build();
 
         return documentRepository.save(document);
+    }
+
+    /**
+     * Enfileira documento para processamento assíncrono via Kafka
+     * Escalável horizontalmente - múltiplas instâncias podem consumir
+     * 
+     * @return CompletableFuture com o ID do evento Kafka
+     */
+    public CompletableFuture<String> createDocumentAsync(String content, Map<String, Object> metadata,
+            String username, String documentType) {
+        log.info("[KAFKA] Enfileirando embedding para usuário '{}', tipo '{}'", username, documentType);
+        return embeddingProducer.sendEmbeddingRequest(content, metadata, username, documentType);
     }
 
     /**
@@ -119,6 +134,7 @@ public class EmbeddingService {
                 .limit(limit)
                 .collect(Collectors.toList());
     }
+
 
     /**
      * Calcula similaridade cosseno entre dois vetores

@@ -1,4 +1,64 @@
 services:
+  ollama-integration-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ollama-integration-app
+    depends_on:
+      - mongodb
+      - kafka
+      - ollama
+    ports:
+      - "8080:8080"
+    environment:
+      # Server
+      SERVER_PORT: 8080
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBEDDING_MODEL: all-minilm:latest
+
+      # MongoDB
+      MONGODB_URI: mongodb://admin:admin123@mongodb:27017/ollama_db?authSource=admin
+      MONGODB_DATABASE: ollama_db
+
+      # JWT
+      JWT_SECRET: your-super-secret-key-change-in-production-min-256-bits
+      JWT_EXPIRATION: 86400000
+
+      # Kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CONSUMER_GROUP_ID: embedding-service-group
+
+      # Swagger
+      SPRINGDOC_API_DOCS_PATH: /api-docs
+      SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
+
+      # Logging
+      LOGGING_LEVEL_ROOT: INFO
+      LOGGING_LEVEL_COM_CAIO_OLLAMA_INTEGRATION: DEBUG
+
+      # Java options
+      JAVA_OPTS: "-Xms512m -Xmx1024m"
+    networks:
+      - ollama-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/actuator/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
@@ -21,7 +81,7 @@ services:
         /bin/ollama serve &
         sleep 5
         ollama pull llama3.2:latest &
-        ollama pull omxbai-embed-large:latest &
+        ollama pull all-minilm:latest &
         wait
 
   mongodb:
@@ -37,6 +97,49 @@ services:
     restart: unless-stopped
     networks:
       - ollama-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - ollama-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - ollama-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   ollama_data:

@@ -187,36 +187,36 @@ public class ConversationService {
 
     /**
      * Indexa conversação como documento para buscas semânticas futuras
+     * Usa Kafka para processamento distribuído e escalável
      */
     private void indexConversationAsDocument(Conversation conversation) {
-        try {
-            log.debug("Indexando conversação: {}", conversation.getId());
+        log.debug("[KAFKA] Enfileirando conversação {} para indexação", conversation.getId());
 
-            // Concatena todas as mensagens em um texto
-            String conversationText = conversation.getMessages().stream()
-                    .map(msg -> msg.getRole() + ": " + msg.getContent())
-                    .collect(Collectors.joining("\n"));
+        // Concatena todas as mensagens em um texto
+        String conversationText = conversation.getMessages().stream()
+                .map(msg -> msg.getRole() + ": " + msg.getContent())
+                .collect(Collectors.joining("\n"));
 
-            // Metadados da conversação
-            java.util.Map<String, Object> metadata = new java.util.HashMap<>();
-            metadata.put("conversationId", conversation.getId());
-            metadata.put("title", conversation.getTitle());
-            metadata.put("model", conversation.getModel());
-            metadata.put("messageCount", conversation.getMessages().size());
+        // Metadados da conversação
+        java.util.Map<String, Object> metadata = new java.util.HashMap<>();
+        metadata.put("conversationId", conversation.getId());
+        metadata.put("title", conversation.getTitle());
+        metadata.put("model", conversation.getModel());
+        metadata.put("messageCount", conversation.getMessages().size());
 
-            // Cria embedding do documento
-            embeddingService.createDocument(
-                    conversationText,
-                    metadata,
-                    conversation.getUsername(),
-                    "conversation");
-
-            log.info("Conversação {} indexada com sucesso", conversation.getId());
-
-        } catch (Exception e) {
-            log.error("Erro ao indexar conversação: {}", e.getMessage(), e);
-            // Não propaga erro para não afetar o fluxo principal
-        }
+        // Enfileira no Kafka para processamento distribuído
+                embeddingService.createDocumentAsync(
+                conversationText,
+                metadata,
+                conversation.getUsername(),
+                "conversation")
+                .thenAccept(eventId -> log.info("[KAFKA] Conversação {} enfileirada - eventId: {}",
+                        conversation.getId(), eventId))
+                .exceptionally(error -> {
+                    log.error("[KAFKA] Erro ao enfileirar conversação {}: {}",
+                            conversation.getId(), error.getMessage(), error);
+                    return null;
+                });
     }
 
     /**

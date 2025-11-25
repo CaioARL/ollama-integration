@@ -1,25 +1,43 @@
 # Ollama Integration Backend
 
-Backend Spring Boot para integração com Ollama (LLM local) usando Spring AI, com autenticação JWT e documentação Swagger/OpenAPI.
+Backend Spring Boot para integração com Ollama (LLM local) usando Spring AI, com autenticação JWT, processamento distribuído com Kafka e documentação Swagger/OpenAPI.
 
 ## 📋 Pré-requisitos
 
-- Java 25+
-- Maven 3.6+
-- Docker e Docker Compose
+- **Opção 1 (Docker - Recomendado)**: Docker e Docker Compose
+- **Opção 2 (Local)**: Java 21+, Maven 3.6+, MongoDB, Kafka, Ollama
 
-## 🚀 Como executar
+## 🚀 Início Rápido (Docker)
 
-### 1. Subir o Ollama com Docker
+### Método 1: Script Automático
 
-```bash
-docker-compose up -d
+**Windows (PowerShell):**
+```powershell
+.\start.ps1
 ```
 
-Isso irá:
-- Iniciar o Ollama na porta `11434`
-- Iniciar o MongoDB na porta `27017`
-- Configurar automaticamente o banco de dados para histórico de conversações
+**Linux/Mac:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+### Método 2: Manual
+
+```bash
+# Build e iniciar toda a stack
+docker-compose up -d --build
+
+# Ver logs
+docker-compose logs -f ollama-integration-app
+```
+
+Isso irá iniciar:
+- 🤖 **Ollama** (porta 11434) - LLM local
+- 🍃 **MongoDB** (porta 27017) - Banco de dados
+- 📨 **Kafka** (porta 9092) - Fila de mensagens distribuída
+- 🔧 **Zookeeper** (porta 2181) - Coordenação Kafka
+- 🚀 **Aplicação** (porta 8080) - API REST
 
 ### 2. Baixar modelos
 
@@ -52,18 +70,54 @@ Para listar modelos instalados:
 docker exec -it ollama ollama list
 ```
 
-### 3. Compilar e executar a aplicação
+## 🏗️ Arquitetura
 
-```bash
-mvn clean install
-mvn spring-boot:run
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Docker Compose Stack                    │
+├──────────────┬────────────────┬────────────┬────────────────┤
+│   Aplicação  │     Kafka      │  MongoDB   │    Ollama      │
+│   (Spring)   │  (Mensageria)  │   (NoSQL)  │    (LLM)       │
+│   :8080      │     :9092      │   :27017   │    :11434      │
+└──────────────┴────────────────┴────────────┴────────────────┘
+       ↓                ↓              ↓             ↓
+   REST API      Fila Embeddings   Histórico    Modelos IA
 ```
 
-A aplicação estará disponível em: `http://localhost:8080`
+### Fluxo de Processamento
 
-## 📚 Documentação Swagger
+1. **Request** → API REST recebe conversação
+2. **Processing** → Gera resposta com Ollama
+3. **Queue** → Enfileira embedding no Kafka
+4. **Consumer** → Worker processa embedding assincronamente
+5. **Storage** → Salva no MongoDB para busca semântica
 
-Acesse a documentação interativa da API em: `http://localhost:8080//ollama-integration/swagger-ui.html`
+## 📚 Documentação
+
+- **API Docs**: http://localhost:8080/swagger-ui.html
+- **Health Check**: http://localhost:8080/actuator/health
+- **Docker Guide**: [DOCKER-GUIDE.md](DOCKER-GUIDE.md)
+- **Kafka Embeddings**: [KAFKA-EMBEDDINGS.md](KAFKA-EMBEDDINGS.md)
+
+## 💻 Desenvolvimento Local
+
+Para desenvolver localmente com hot-reload:
+
+```bash
+# 1. Subir apenas infraestrutura
+docker-compose -f docker-compose.dev.yml up -d
+
+# 2. Rodar aplicação em modo dev
+mvn spring-boot:run
+
+# Ou via IDE (IntelliJ/Eclipse/VS Code)
+```
+
+Vantagens:
+- ✅ Hot reload automático
+- ✅ Debug facilitado
+- ✅ Logs diretos no terminal
+- ✅ Infraestrutura isolada
 
 ## ⚙️ Configuração com .env
 
@@ -447,13 +501,67 @@ curl -X GET "http://localhost:8080/ollama-integration/v1/conversations/search?qu
   -H "Authorization: Bearer {seu_token}"
 ```
 
+## 🐳 Comandos Docker Úteis
+
+```bash
+# Ver logs em tempo real
+docker-compose logs -f ollama-integration-app
+
+# Rebuild da aplicação
+docker-compose build --no-cache ollama-integration-app
+docker-compose up -d ollama-integration-app
+
+# Escalar horizontalmente (3 instâncias)
+docker-compose up -d --scale ollama-integration-app=3
+
+# Reiniciar apenas um serviço
+docker-compose restart kafka
+
+# Ver uso de recursos
+docker stats
+
+# Limpar tudo (inclusive volumes)
+docker-compose down -v
+
+# Acessar shell do container
+docker exec -it ollama-integration-app sh
+
+# Ver variáveis de ambiente
+docker exec ollama-integration-app env
+```
+
+## 🔍 Monitoramento Kafka
+
+```bash
+# Listar tópicos
+docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
+
+# Ver mensagens em tempo real
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic embedding-requests \
+  --from-beginning
+
+# Ver consumer groups
+docker exec -it kafka kafka-consumer-groups \
+  --bootstrap-server localhost:9092 --list
+
+# Ver lag do consumer
+docker exec -it kafka kafka-consumer-groups \
+  --bootstrap-server localhost:9092 \
+  --group embedding-service-group \
+  --describe
+```
+
 ## 📚 Recursos
 
 - [Spring AI Documentation](https://docs.spring.io/spring-ai/reference/)
 - [Spring Security Documentation](https://spring.io/projects/spring-security)
+- [Spring Kafka Documentation](https://spring.io/projects/spring-kafka)
 - [Swagger/OpenAPI Specification](https://swagger.io/specification/)
 - [Ollama Models](https://ollama.ai/library)
-- [Open WebUI](https://github.com/open-webui/open-webui)
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
 
 ## 🧠 Como Funciona o RAG Automático
 

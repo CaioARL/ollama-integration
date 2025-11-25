@@ -99,6 +99,12 @@
 			<artifactId>spring-boot-starter-webflux</artifactId>
 		</dependency>
 
+		<!-- Kafka for distributed messaging -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
 		<!-- MongoDB -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
