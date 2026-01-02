@@ -33,6 +33,42 @@
             "type": "java.lang.Double",
             "description": "Default minimum similarity threshold for general document searches (0.0 to 1.0).",
             "defaultValue": 0.60
+        },
+        {
+            "name": "app.rag.max-context-tokens",
+            "type": "java.lang.Integer",
+            "description": "Maximum number of tokens to include in RAG context to avoid exceeding model limits.",
+            "defaultValue": 2000
+        },
+        {
+            "name": "app.rag.time-decay-days",
+            "type": "java.lang.Integer",
+            "description": "Number of days for time decay scoring. Documents older than this have exponentially lower relevance.",
+            "defaultValue": 30
+        },
+        {
+            "name": "app.rag.diversity-penalty",
+            "type": "java.lang.Double",
+            "description": "Penalty factor (0.0 to 1.0) to reduce redundancy in retrieved documents. Higher = more diversity.",
+            "defaultValue": 0.3
+        },
+        {
+            "name": "app.rag.max-documents",
+            "type": "java.lang.Integer",
+            "description": "Maximum number of documents to retrieve and include in RAG context.",
+            "defaultValue": 5
+        },
+        {
+            "name": "app.rag.enable-reranking",
+            "type": "java.lang.Boolean",
+            "description": "Enable advanced re-ranking algorithm using composite scores (similarity + recency + relevance).",
+            "defaultValue": true
+        },
+        {
+            "name": "app.rag.enable-hybrid-search",
+            "type": "java.lang.Boolean",
+            "description": "Enable hybrid search combining vector similarity with keyword matching (experimental).",
+            "defaultValue": false
         }
     ]
 }

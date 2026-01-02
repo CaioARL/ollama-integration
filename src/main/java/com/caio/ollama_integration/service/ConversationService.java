@@ -32,12 +32,16 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final OllamaService ollamaService;
     private final EmbeddingService embeddingService;
+    private final RAGService ragService;
 
     @Value("${app.similarity.rag-threshold:0.70}")
     private double ragSimilarityThreshold;
 
     @Value("${app.similarity.conversation-threshold:0.60}")
     private double conversationSimilarityThreshold;
+
+    @Value("${app.rag.max-documents:5}")
+    private int maxRagDocuments;
 
     /**
      * Lista todos os modelos disponíveis no Ollama
@@ -157,37 +161,24 @@ public class ConversationService {
     }
 
     /**
-     * Constrói mensagem enriquecida com contexto RAG
-     * Busca documentos relevantes e adiciona ao prompt
+     * Constrói mensagem enriquecida com contexto RAG usando algoritmo avançado
+     * Busca documentos relevantes com ranking composto e adiciona ao prompt
      * Aplica threshold de similaridade mínima para evitar contexto irrelevante
      */
     private String buildRAGEnhancedMessage(String userMessage, String username) {
         try {
-            log.debug("Buscando contexto RAG para: {}", userMessage);
+                log.debug("Buscando contexto RAG avançado para: {}", userMessage);
 
-            // Busca top 3 documentos mais relevantes (usa threshold do properties)
-            List<EmbeddingDocument> relevantDocs = embeddingService
-                    .searchSimilarDocuments(userMessage, username, null, 3, ragSimilarityThreshold);
+            // Usa RAGService com ranking avançado (similaridade + recência + relevância)
+            String enhancedPrompt = ragService.buildEnhancedPrompt(userMessage, username, maxRagDocuments);
 
-            if (relevantDocs.isEmpty()) {
-                log.debug("Nenhum documento relevante encontrado (threshold: {}), usando mensagem original",
-                        ragSimilarityThreshold);
-                return userMessage;
-            } // Constrói contexto a partir dos documentos encontrados
-            StringBuilder context = new StringBuilder();
-            context.append("Contexto relevante encontrado:\n\n");
-
-            for (int i = 0; i < relevantDocs.size(); i++) {
-                EmbeddingDocument doc = relevantDocs.get(i);
-                context.append(String.format("[Documento %d]\n%s\n\n", i + 1, doc.getContent()));
+            if (enhancedPrompt.equals(userMessage)) {
+                    log.debug("RAG não encontrou contexto relevante, usando mensagem original");
+            } else {
+                    log.info("Mensagem enriquecida com contexto RAG otimizado");
             }
 
-            context.append("---\n\n");
-            context.append("Com base no contexto acima, responda à seguinte pergunta:\n");
-            context.append(userMessage);
-
-            log.info("Mensagem enriquecida com {} documentos relevantes", relevantDocs.size());
-            return context.toString();
+            return enhancedPrompt;
 
         } catch (Exception e) {
             log.warn("Erro ao buscar contexto RAG, usando mensagem original: {}", e.getMessage());
