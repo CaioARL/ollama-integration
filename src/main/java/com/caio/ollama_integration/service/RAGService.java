@@ -51,7 +51,7 @@ public class RAGService {
 
         // 1. Busca inicial com threshold base (busca mais documentos para re-ranking)
         List<EmbeddingDocument> candidates = embeddingService
-                .searchSimilarDocuments(query, username, null, limit * 3, ragSimilarityThreshold * 0.8);
+                .searchSimilarDocuments(query, username, null, limit * 3, 0);
 
         if (candidates.isEmpty()) {
             log.debug("Nenhum documento candidato encontrado");
